@@ -8,6 +8,7 @@
     
     <application
         android:label="EasyPod"
+        android:icon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/Theme.EasyPod">
