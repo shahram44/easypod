@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "478434765335",
+    "project_id": "easypood-45536",
+    "storage_bucket": "easypood-45536.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:478434765335:android:2df47236c76be7ee15ca52",
+        "android_client_info": {
+          "package_name": "com.example.easypod"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCKL7YkcBGBbTdSJqfBH892nrSmTrcLPw4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
