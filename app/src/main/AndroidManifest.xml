@@ -10,7 +10,7 @@
         android:label="EasyPod"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
-        android:theme="@style/Theme.AppCompat.Light.NoActionBar">
+        android:theme="@style/Theme.EasyPod">
         <activity
             android:name=".MainActivity"
             android:exported="true"
