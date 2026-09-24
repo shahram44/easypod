@@ -16,6 +16,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -45,6 +46,6 @@
         <!-- متادیتای FCM برای کانال پیش‌فرض -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="easypod_notifications" />
+            android:value="easypod_notifications_v2" />
     </application>
 </manifest>
