@@ -35,7 +35,8 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
         }
 
         // نمایش نوتیفیکیشن
-        int notificationId = (int) System.currentTimeMillis();
+        int notificationId = getNotificationId(remoteMessage);
+        rememberLastNotificationId(notificationId);
         NotificationHelper.showNotification(this, notificationId, title, message, link);
     }
 
@@ -47,7 +48,29 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     }
 
     private void sendTokenToServer(String token) {
-        // این متد را در گام بعدی پیاده‌سازی می‌کنیم
         TokenSender.send(getApplicationContext(), token);
+    }
+
+    private int getNotificationId(RemoteMessage remoteMessage) {
+        try {
+            String id = remoteMessage.getData().get("notification_id");
+            if (id != null && !id.isEmpty()) {
+                return Integer.parseInt(id);
+            }
+        } catch (NumberFormatException ignored) {
+            Log.w(TAG, "شناسه اعلان FCM معتبر نیست");
+        }
+        return (int) (System.currentTimeMillis() & 0x7fffffff);
+    }
+
+    private void rememberLastNotificationId(int notificationId) {
+        if (notificationId <= 0) return;
+
+        android.content.SharedPreferences prefs =
+            getSharedPreferences("easypod_prefs", MODE_PRIVATE);
+        int lastId = prefs.getInt("last_notification_id", 0);
+        if (notificationId > lastId) {
+            prefs.edit().putInt("last_notification_id", notificationId).apply();
+        }
     }
 }

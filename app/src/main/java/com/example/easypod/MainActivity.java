@@ -65,6 +65,7 @@ public class MainActivity extends AppCompatActivity {
     private ExecutorService executor;
     private int lastNotificationId = 0;
     private boolean isPollingActive = false;
+    private String pendingNotificationLink;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -86,13 +87,7 @@ public class MainActivity extends AppCompatActivity {
         setupSwipeRefresh();
         setupRetryButton();
 
-        FirebaseMessaging.getInstance().getToken()
-            .addOnCompleteListener(task -> {
-                if (task.isSuccessful() && task.getResult() != null) {
-                    String token = task.getResult();
-                    TokenSender.send(this, token);
-                }
-            });
+        handleNotificationIntent(getIntent());
 
         if (isNetworkAvailable()) {
             webView.loadUrl(APP_URL);
@@ -142,6 +137,8 @@ public class MainActivity extends AppCompatActivity {
                 swipeRefresh.setRefreshing(false);
                 errorLayout.setVisibility(View.GONE);
                 if (!isPollingActive) startPolling();
+                syncFcmTokenWithServer();
+                openPendingNotificationLink();
             }
 
             @Override
@@ -227,6 +224,9 @@ public class MainActivity extends AppCompatActivity {
 
     private void fetchNewNotifications() {
         if (!isNetworkAvailable()) return;
+        // شاید یک Push همین حالا در FirebaseMessagingService دریافت شده باشد؛
+        // مقدار ذخیره‌شده را بخوان تا polling همان اعلان را دوباره نشان ندهد.
+        lastNotificationId = Math.max(lastNotificationId, prefs.getInt("last_notification_id", 0));
         executor.execute(() -> {
             try {
                 URL url = new URL(API_BASE + "/notifications/since/" + lastNotificationId);
@@ -272,6 +272,52 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
         });
+    }
+
+    /**
+     * FCM token پیش از ورود کاربر معتبر است، اما ثبت آن در سرور به سشنِ WebView نیاز دارد.
+     * به همین دلیل پس از پایان هر صفحه نیز همگام‌سازی می‌کنیم تا بلافاصله پس از login ثبت شود.
+     */
+    private void syncFcmTokenWithServer() {
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful() || task.getResult() == null) return;
+
+            String token = task.getResult();
+            String registeredToken = prefs.getString("registered_fcm_token", "");
+            if (!token.equals(registeredToken)) {
+                TokenSender.send(getApplicationContext(), token);
+            }
+        });
+    }
+
+    private void handleNotificationIntent(Intent intent) {
+        if (intent == null) return;
+
+        String link = intent.getStringExtra("notification_link");
+        if (link != null && !link.trim().isEmpty()) {
+            pendingNotificationLink = link.trim();
+        }
+    }
+
+    private void openPendingNotificationLink() {
+        if (pendingNotificationLink == null || webView == null) return;
+
+        String link = pendingNotificationLink;
+        String targetUrl;
+        if (link.startsWith("/")) {
+            targetUrl = "https://easypood.ir" + link;
+        } else if (link.startsWith(APP_URL)) {
+            targetUrl = link;
+        } else {
+            // پیوندهای بیرونی از Push اجرا نمی‌شوند.
+            pendingNotificationLink = null;
+            return;
+        }
+
+        pendingNotificationLink = null;
+        if (!targetUrl.equals(webView.getUrl())) {
+            webView.loadUrl(targetUrl);
+        }
     }
 
     private void setupSwipeRefresh() {
@@ -334,6 +380,23 @@ public class MainActivity extends AppCompatActivity {
         stopPolling();
         if (executor != null) executor.shutdown();
         super.onDestroy();
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        handleNotificationIntent(intent);
+        openPendingNotificationLink();
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == NOTIFICATION_PERMISSION_CODE
+                && (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
+            Toast.makeText(this, "برای دریافت اعلان‌های EasyPod، اجازهٔ اعلان را فعال کنید.", Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
