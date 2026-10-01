@@ -64,10 +64,10 @@ public class MainActivity extends AppCompatActivity {
     private final static String API_BASE = "https://easypood.ir/cmms/api";
     private final static long POLLING_INTERVAL = 30000;
 
-    // ✅ حداقل فاصله بین دو sync موفق FCM (5 دقیقه)
-    private final static long FCM_SYNC_MIN_INTERVAL = 5 * 60 * 1000;
-    // ✅ تأخیر پس از لود صفحه قبل از ارسال توکن (3 ثانیه)
-    private final static long FCM_SYNC_DELAY = 3000;
+    // ✅ حداقل فاصله بین دو sync موفق FCM (2 دقیقه - کوتاه‌تر برای تست)
+    private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
+    // ✅ تأخیر پس از لود صفحه قبل از ارسال توکن (5 ثانیه - بیشتر برای اطمینان)
+    private final static long FCM_SYNC_DELAY = 5000;
 
     private SharedPreferences prefs;
     private Handler pollingHandler;
@@ -150,9 +150,11 @@ public class MainActivity extends AppCompatActivity {
                 if (!isPollingActive) startPolling();
 
                 // ✅ با تأخیر، توکن FCM را با سرور سینک کن
-                // تأخیر برای اطمینان از ثبت کامل Cookie در WebView
+                // نکته: چون صفحه لاگین و داشبورد هر دو در /cmms/ هستند،
+                // نمی‌توانیم از URL برای تشخیص صفحه لاگین استفاده کنیم.
+                // به جای آن، از تزریق JavaScript برای بررسی لاگین بودن استفاده می‌کنیم.
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                    syncFcmTokenWithServer();
+                    checkIfLoggedInAndSync();
                 }, FCM_SYNC_DELAY);
 
                 openPendingNotificationLink();
@@ -216,6 +218,52 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    /**
+     * ✅ بررسی با JavaScript که کاربر لاگین است یا نه
+     * 
+     * مشکل نسخه قبلی: هم صفحه لاگین و هم داشبورد در /cmms/ هستند،
+     * پس نمی‌توان با URL تشخیص داد.
+     * 
+     * راه‌حل: با JavaScript بررسی می‌کنیم که آیا نشانه‌های لاگین وجود دارد یا نه.
+     * - اگر در navbar کلاس `navbar-user` وجود داشت → کاربر لاگین است
+     * - اگر در صفحه login بود، این عنصر وجود ندارد
+     */
+    private void checkIfLoggedInAndSync() {
+        if (webView == null) return;
+
+        webView.evaluateJavascript(
+            "(function() {" +
+            "   var navbarUser = document.querySelector('.navbar-user');" +
+            "   var loginForm = document.querySelector('form#loginFormSubmit');" +
+            "   var bodyClass = document.body ? document.body.className : '';" +
+            "   " +
+            "   // اگر navbar-user وجود دارد و form لاگین نیست → لاگین است" +
+            "   var isLoggedIn = (navbarUser !== null) && (loginForm === null);" +
+            "   " +
+            "   // همچنین چک کن user-id meta tag" +
+            "   var userIdMeta = document.querySelector('meta[name=\"user-id\"]');" +
+            "   if (userIdMeta && userIdMeta.content && parseInt(userIdMeta.content) > 0) {" +
+            "       isLoggedIn = true;" +
+            "   }" +
+            "   " +
+            "   return isLoggedIn ? 'YES' : 'NO';" +
+            "})()",
+            result -> {
+                // نتیجه به صورت رشته JSON برمی‌گردد: "YES" یا "NO"
+                boolean isLoggedIn = result != null && result.contains("YES");
+                
+                Log.d(TAG, "بررسی لاگین: نتیجه = " + result + " | isLoggedIn = " + isLoggedIn);
+                
+                if (isLoggedIn) {
+                    Log.d(TAG, "✅ کاربر لاگین است، شروع sync توکن FCM");
+                    syncFcmTokenWithServer();
+                } else {
+                    Log.d(TAG, "❌ کاربر لاگین نیست، sync انجام نمی‌شود");
+                }
+            }
+        );
+    }
+
     private void startPolling() {
         if (isPollingActive) return;
         isPollingActive = true;
@@ -241,8 +289,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void fetchNewNotifications() {
         if (!isNetworkAvailable()) return;
-        // شاید یک Push همین حالا در FirebaseMessagingService دریافت شده باشد؛
-        // مقدار ذخیره‌شده را بخوان تا polling همان اعلان را دوباره نشان ندهد.
         lastNotificationId = Math.max(lastNotificationId, prefs.getInt("last_notification_id", 0));
         executor.execute(() -> {
             try {
@@ -292,38 +338,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /**
-     * ✅ نسخه اصلاح‌شده sync توکن FCM با سرور
-     *
-     * مشکلات نسخه قبلی که رفع شده:
-     *   1. شرط !token.equals(registeredToken) باعث می‌شد توکن جدید فقط اگر تغییر کرده بود ارسال شود.
-     *      اما اگر سرور توکن را گم کرده باشد، هرگز دوباره دریافت نمی‌کرد.
-     *   2. onPageFinished بلافاصله اجرا می‌شد و Cookie ممکن بود آماده نباشد.
-     *   3. درخواست‌های مکرر به سرور در هر بار تغییر صفحه.
-     *
-     * راه‌حل جدید:
-     *   - همیشه توکن ارسال می‌شود (نه فقط اگر تغییر کرده باشد)
-     *   - با فاصله حداقل 5 دقیقه بین دو ارسال
-     *   - پس از 3 ثانیه تأخیر از onPageFinished برای اطمینان از ثبت Cookie
-     *   - فقط در صفحات غیر از لاگین اجرا می‌شود
+     * ✅ sync توکن FCM با سرور
+     * (بدون چک URL، چون قبلاً چک شده که لاگین است)
      */
     private void syncFcmTokenWithServer() {
-        // چک: در صفحه لاگین یا ثبت‌نام نیستیم
-        String currentUrl = webView.getUrl();
-        if (currentUrl == null) {
-            Log.d(TAG, "syncFcm: URL null، صرف‌نظر");
-            return;
-        }
-
-        boolean isLoginPage = currentUrl.contains("/login")
-                || currentUrl.contains("/register")
-                || currentUrl.endsWith("/cmms/")
-                || currentUrl.endsWith("/cmms");
-
-        if (isLoginPage) {
-            Log.d(TAG, "syncFcm: در صفحه ورود/ثبت‌نام هستیم، sync نمی‌کنیم");
-            return;
-        }
-
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
                 Log.e(TAG, "syncFcm: خطا در دریافت توکن از Firebase", task.getException());
@@ -333,26 +351,25 @@ public class MainActivity extends AppCompatActivity {
             String token = task.getResult();
             Log.d(TAG, "syncFcm: توکن Firebase دریافت شد (طول: " + token.length() + ")");
 
-            // ✅ چک فاصله زمانی: در 5 دقیقه اخیر sync نکرده باشیم
+            // ✅ چک فاصله زمانی
             long lastSyncTime = prefs.getLong("last_fcm_sync_time", 0);
             long now = System.currentTimeMillis();
 
             if (now - lastSyncTime < FCM_SYNC_MIN_INTERVAL) {
-                Log.d(TAG, "syncFcm: کمتر از 5 دقیقه از sync قبلی، صرف‌نظر");
+                Log.d(TAG, "syncFcm: کمتر از " + (FCM_SYNC_MIN_INTERVAL / 1000) + " ثانیه از sync قبلی، صرف‌نظر");
                 return;
             }
 
             Log.d(TAG, "syncFcm: ارسال توکن به سرور...");
             TokenSender.send(getApplicationContext(), token);
 
-            // ثبت زمان آخرین sync
+            // ثبت زمان
             prefs.edit().putLong("last_fcm_sync_time", now).apply();
         });
     }
 
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
-
         String link = intent.getStringExtra("notification_link");
         if (link != null && !link.trim().isEmpty()) {
             pendingNotificationLink = link.trim();
@@ -361,7 +378,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void openPendingNotificationLink() {
         if (pendingNotificationLink == null || webView == null) return;
-
         String link = pendingNotificationLink;
         String targetUrl;
         if (link.startsWith("/")) {
@@ -369,11 +385,9 @@ public class MainActivity extends AppCompatActivity {
         } else if (link.startsWith(APP_URL)) {
             targetUrl = link;
         } else {
-            // پیوندهای بیرونی از Push اجرا نمی‌شوند.
             pendingNotificationLink = null;
             return;
         }
-
         pendingNotificationLink = null;
         if (!targetUrl.equals(webView.getUrl())) {
             webView.loadUrl(targetUrl);
