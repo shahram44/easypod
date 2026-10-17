@@ -19,6 +19,7 @@ import android.util.Log;
 import android.view.View;
 import android.webkit.CookieManager;
 import android.webkit.DownloadListener;
+import android.webkit.PermissionRequest;
 import android.webkit.ValueCallback;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
@@ -60,13 +61,17 @@ public class MainActivity extends AppCompatActivity {
 
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
     private final static int NOTIFICATION_PERMISSION_CODE = 100;
+    // ✅ جدید: کد درخواست دسترسی دوربین
+    private final static int CAMERA_PERMISSION_CODE = 101;
+
     private final static String APP_URL = "https://easypood.ir/cmms/";
     private final static String API_BASE = "https://easypood.ir/cmms/api";
+    private final static String BASE_HOST = "https://easypood.ir/cmms";
     private final static long POLLING_INTERVAL = 30000;
 
-    // ✅ حداقل فاصله بین دو sync موفق FCM (2 دقیقه - کوتاه‌تر برای تست)
+    // ✅ حداقل فاصله بین دو sync موفق FCM (2 دقیقه)
     private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
-    // ✅ تأخیر پس از لود صفحه قبل از ارسال توکن (5 ثانیه - بیشتر برای اطمینان)
+    // ✅ تأخیر پس از لود صفحه قبل از ارسال توکن (5 ثانیه)
     private final static long FCM_SYNC_DELAY = 5000;
 
     private SharedPreferences prefs;
@@ -76,6 +81,9 @@ public class MainActivity extends AppCompatActivity {
     private int lastNotificationId = 0;
     private boolean isPollingActive = false;
     private String pendingNotificationLink;
+
+    // ✅ جدید: نگهداری درخواست دسترسی دوربین که منتظر تأیید کاربر است
+    private PermissionRequest pendingCameraPermissionRequest;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -97,10 +105,17 @@ public class MainActivity extends AppCompatActivity {
         setupSwipeRefresh();
         setupRetryButton();
 
+        // ✅ پردازش Intent اولیه (می‌تواند Deep Link یا نوتیفیکیشن باشد)
         handleNotificationIntent(getIntent());
+        String initialDeepLink = extractDeepLinkUrl(getIntent());
 
         if (isNetworkAvailable()) {
-            webView.loadUrl(APP_URL);
+            if (initialDeepLink != null) {
+                Log.d(TAG, "🚀 باز کردن Deep Link اولیه: " + initialDeepLink);
+                webView.loadUrl(initialDeepLink);
+            } else {
+                webView.loadUrl(APP_URL);
+            }
         } else {
             showErrorPage();
         }
@@ -130,6 +145,9 @@ public class MainActivity extends AppCompatActivity {
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
 
+        // ✅ جدید: پشتیبانی از MediaPlayback و getUserMedia
+        settings.setMediaPlaybackRequiresUserGesture(false);
+
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
@@ -150,9 +168,6 @@ public class MainActivity extends AppCompatActivity {
                 if (!isPollingActive) startPolling();
 
                 // ✅ با تأخیر، توکن FCM را با سرور سینک کن
-                // نکته: چون صفحه لاگین و داشبورد هر دو در /cmms/ هستند،
-                // نمی‌توانیم از URL برای تشخیص صفحه لاگین استفاده کنیم.
-                // به جای آن، از تزریق JavaScript برای بررسی لاگین بودن استفاده می‌کنیم.
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     checkIfLoggedInAndSync();
                 }, FCM_SYNC_DELAY);
@@ -171,6 +186,62 @@ public class MainActivity extends AppCompatActivity {
             public void onProgressChanged(WebView view, int newProgress) {
                 progressBar.setProgress(newProgress);
                 if (newProgress == 100) progressBar.setVisibility(View.GONE);
+            }
+
+            // ============================================================
+            // ✅ جدید: مدیریت درخواست دسترسی (دوربین برای اسکن QR)
+            // ============================================================
+            @Override
+            public void onPermissionRequest(final PermissionRequest request) {
+                Log.d(TAG, "onPermissionRequest: " + java.util.Arrays.toString(request.getResources()));
+
+                // بررسی اینکه آیا درخواست شامل دوربین است
+                boolean needCamera = false;
+                boolean needAudio = false;
+                for (String resource : request.getResources()) {
+                    if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
+                        needCamera = true;
+                    } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                        needAudio = true;
+                    }
+                }
+
+                // اگر فقط دوربین لازم است (اسکن QR)
+                if (needCamera && !needAudio) {
+                    // بررسی دسترسی دوربین در سطح اندروید
+                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                            != PackageManager.PERMISSION_GRANTED) {
+                        // هنوز دسترسی نداریم → از کاربر بخواهیم
+                        pendingCameraPermissionRequest = request;
+                        ActivityCompat.requestPermissions(
+                                MainActivity.this,
+                                new String[]{Manifest.permission.CAMERA},
+                                CAMERA_PERMISSION_CODE
+                        );
+                        return;
+                    }
+                    // دسترسی داریم → به WebView بده
+                    runOnUiThread(() -> {
+                        try {
+                            request.grant(request.getResources());
+                        } catch (Exception e) {
+                            Log.e(TAG, "خطا در grant کردن دسترسی دوربین: " + e.getMessage());
+                            try { request.deny(); } catch (Exception ignored) {}
+                        }
+                    });
+                    return;
+                }
+
+                // درخواست‌های دیگر (مثلاً میکروفن) → اجازه می‌دهیم
+                // اگر نمی‌خواهید اجازه دهید، این قسمت را حذف کنید
+                runOnUiThread(() -> {
+                    try {
+                        request.grant(request.getResources());
+                    } catch (Exception e) {
+                        Log.e(TAG, "خطا در grant کردن دسترسی: " + e.getMessage());
+                        try { request.deny(); } catch (Exception ignored) {}
+                    }
+                });
             }
 
             @Override
@@ -220,13 +291,6 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * ✅ بررسی با JavaScript که کاربر لاگین است یا نه
-     * 
-     * مشکل نسخه قبلی: هم صفحه لاگین و هم داشبورد در /cmms/ هستند،
-     * پس نمی‌توان با URL تشخیص داد.
-     * 
-     * راه‌حل: با JavaScript بررسی می‌کنیم که آیا نشانه‌های لاگین وجود دارد یا نه.
-     * - اگر در navbar کلاس `navbar-user` وجود داشت → کاربر لاگین است
-     * - اگر در صفحه login بود، این عنصر وجود ندارد
      */
     private void checkIfLoggedInAndSync() {
         if (webView == null) return;
@@ -235,12 +299,9 @@ public class MainActivity extends AppCompatActivity {
             "(function() {" +
             "   var navbarUser = document.querySelector('.navbar-user');" +
             "   var loginForm = document.querySelector('form#loginFormSubmit');" +
-            "   var bodyClass = document.body ? document.body.className : '';" +
             "   " +
-            "   // اگر navbar-user وجود دارد و form لاگین نیست → لاگین است" +
             "   var isLoggedIn = (navbarUser !== null) && (loginForm === null);" +
             "   " +
-            "   // همچنین چک کن user-id meta tag" +
             "   var userIdMeta = document.querySelector('meta[name=\"user-id\"]');" +
             "   if (userIdMeta && userIdMeta.content && parseInt(userIdMeta.content) > 0) {" +
             "       isLoggedIn = true;" +
@@ -249,11 +310,9 @@ public class MainActivity extends AppCompatActivity {
             "   return isLoggedIn ? 'YES' : 'NO';" +
             "})()",
             result -> {
-                // نتیجه به صورت رشته JSON برمی‌گردد: "YES" یا "NO"
                 boolean isLoggedIn = result != null && result.contains("YES");
-                
                 Log.d(TAG, "بررسی لاگین: نتیجه = " + result + " | isLoggedIn = " + isLoggedIn);
-                
+
                 if (isLoggedIn) {
                     Log.d(TAG, "✅ کاربر لاگین است، شروع sync توکن FCM");
                     syncFcmTokenWithServer();
@@ -337,10 +396,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * ✅ sync توکن FCM با سرور
-     * (بدون چک URL، چون قبلاً چک شده که لاگین است)
-     */
     private void syncFcmTokenWithServer() {
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
@@ -351,7 +406,6 @@ public class MainActivity extends AppCompatActivity {
             String token = task.getResult();
             Log.d(TAG, "syncFcm: توکن Firebase دریافت شد (طول: " + token.length() + ")");
 
-            // ✅ چک فاصله زمانی
             long lastSyncTime = prefs.getLong("last_fcm_sync_time", 0);
             long now = System.currentTimeMillis();
 
@@ -363,7 +417,6 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "syncFcm: ارسال توکن به سرور...");
             TokenSender.send(getApplicationContext(), token);
 
-            // ثبت زمان
             prefs.edit().putLong("last_fcm_sync_time", now).apply();
         });
     }
@@ -374,6 +427,41 @@ public class MainActivity extends AppCompatActivity {
         if (link != null && !link.trim().isEmpty()) {
             pendingNotificationLink = link.trim();
         }
+    }
+
+    // ============================================================
+    // ✅ جدید: استخراج URL از Deep Link
+    // easypod://m/123  →  https://easypood.ir/cmms/m/123
+    // ============================================================
+    private String extractDeepLinkUrl(Intent intent) {
+        if (intent == null) return null;
+        Uri data = intent.getData();
+        if (data == null) return null;
+
+        String scheme = data.getScheme();
+        if (!"easypod".equalsIgnoreCase(scheme)) {
+            return null;
+        }
+
+        // easypod://m/123 → path = "/123" و host = "m"
+        // easypod://machines/view/123 → path = "/view/123" و host = "machines"
+        String host = data.getHost();  // "m" یا "machines"
+        String path = data.getPath();  // "/123" یا "/view/123"
+
+        if (host == null) host = "";
+
+        String fullPath;
+        if (path == null || path.isEmpty()) {
+            fullPath = "/" + host;
+        } else {
+            fullPath = "/" + host + path;
+        }
+
+        // ساخت URL کامل
+        String finalUrl = BASE_HOST + fullPath;
+
+        Log.d(TAG, "🔗 Deep Link استخراج شد: " + finalUrl);
+        return finalUrl;
     }
 
     private void openPendingNotificationLink() {
@@ -461,15 +549,57 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleNotificationIntent(intent);
+
+        // ✅ بررسی Deep Link جدید (اگر اپ از قبل باز بود)
+        String deepLinkUrl = extractDeepLinkUrl(intent);
+        if (deepLinkUrl != null && webView != null) {
+            Log.d(TAG, "🚀 Deep Link جدید: " + deepLinkUrl);
+            webView.loadUrl(deepLinkUrl);
+            return;
+        }
+
         openPendingNotificationLink();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == NOTIFICATION_PERMISSION_CODE
-                && (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
-            Toast.makeText(this, "برای دریافت اعلان‌های EasyPod، اجازهٔ اعلان را فعال کنید.", Toast.LENGTH_LONG).show();
+
+        // ===== اعلان‌ها =====
+        if (requestCode == NOTIFICATION_PERMISSION_CODE) {
+            if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
+                Toast.makeText(this, "برای دریافت اعلان‌های EasyPod، اجازهٔ اعلان را فعال کنید.", Toast.LENGTH_LONG).show();
+            }
+            return;
+        }
+
+        // ===== ✅ دوربین (برای اسکن QR) =====
+        if (requestCode == CAMERA_PERMISSION_CODE) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                Log.d(TAG, "✅ دسترسی دوربین داده شد");
+                if (pendingCameraPermissionRequest != null) {
+                    final PermissionRequest req = pendingCameraPermissionRequest;
+                    pendingCameraPermissionRequest = null;
+                    runOnUiThread(() -> {
+                        try {
+                            req.grant(req.getResources());
+                        } catch (Exception e) {
+                            Log.e(TAG, "خطا در grant کردن دسترسی دوربین: " + e.getMessage());
+                            try { req.deny(); } catch (Exception ignored) {}
+                        }
+                    });
+                }
+            } else {
+                Log.w(TAG, "❌ دسترسی دوربین رد شد");
+                Toast.makeText(this, "برای اسکن QR، دسترسی دوربین لازم است. لطفاً از تنظیمات اپ آن را فعال کنید.", Toast.LENGTH_LONG).show();
+                if (pendingCameraPermissionRequest != null) {
+                    final PermissionRequest req = pendingCameraPermissionRequest;
+                    pendingCameraPermissionRequest = null;
+                    runOnUiThread(() -> {
+                        try { req.deny(); } catch (Exception ignored) {}
+                    });
+                }
+            }
         }
     }
 
