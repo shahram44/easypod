@@ -7,6 +7,11 @@
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     
+    <!-- ✅ جدید: دسترسی به دوربین برای اسکن QR -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
+    
     <application
         android:label="EasyPod"
         android:usesCleartextTraffic="true"
@@ -18,9 +23,20 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden">
+            
+            <!-- Intent-filter اصلی (اجرای عادی اپ) -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            
+            <!-- ✅ جدید: Deep Link برای اسکن با دوربین پیش‌فرض گوشی -->
+            <!-- easypod://m/123 → شناسنامه دستگاه -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="easypod" />
             </intent-filter>
         </activity>
         
@@ -43,7 +59,6 @@
                 android:resource="@xml/file_paths" />
         </provider>
         
-        <!-- متادیتای FCM برای کانال پیش‌فرض -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="easypod_notifications_v2" />
