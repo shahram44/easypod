@@ -1,1 +1,17 @@
 
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- ============================================ -->
+    <!-- رنگ‌های برند EasyPod                          -->
+    <!-- ============================================ -->
+    
+    <!-- ✅ رنگ پس‌زمینه Splash (سبز-آبی برند) -->
+    <color name="splash_background">#1a7a7a</color>
+    
+    <!-- رنگ‌های دیگر (در صورت نیاز پروژه) -->
+    <color name="brand_primary">#1a7a7a</color>
+    <color name="brand_dark">#0f4c5c</color>
+    <color name="white">#FFFFFF</color>
+    <color name="black">#000000</color>
+    
+</resources>
