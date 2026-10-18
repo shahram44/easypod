@@ -68,6 +68,8 @@ public class MainActivity extends AppCompatActivity {
     private final static String API_BASE = "https://easypood.ir/cmms/api";
     private final static String BASE_HOST = "https://easypood.ir/cmms";
     private final static long POLLING_INTERVAL = 30000;
+    // برای refresh باید یک کشش عمدی انجام شود، نه حرکت کوتاه هنگام اسکرول.
+    private final static int REFRESH_TRIGGER_DISTANCE_DP = 144;
 
     // ✅ حداقل فاصله بین دو sync موفق FCM (2 دقیقه)
     private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
@@ -81,9 +83,12 @@ public class MainActivity extends AppCompatActivity {
     private int lastNotificationId = 0;
     private boolean isPollingActive = false;
     private String pendingNotificationLink;
+<<<<<<< HEAD
 
     // ✅ جدید: نگهداری درخواست دسترسی دوربین که منتظر تأیید کاربر است
     private PermissionRequest pendingCameraPermissionRequest;
+=======
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -105,9 +110,13 @@ public class MainActivity extends AppCompatActivity {
         setupSwipeRefresh();
         setupRetryButton();
 
+<<<<<<< HEAD
         // ✅ پردازش Intent اولیه (می‌تواند Deep Link یا نوتیفیکیشن باشد)
         handleNotificationIntent(getIntent());
         String initialDeepLink = extractDeepLinkUrl(getIntent());
+=======
+        handleNotificationIntent(getIntent());
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
 
         if (isNetworkAvailable()) {
             if (initialDeepLink != null) {
@@ -154,6 +163,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
+                configurePullToRefresh(url);
                 progressBar.setVisibility(View.VISIBLE);
                 progressBar.setProgress(0);
                 errorLayout.setVisibility(View.GONE);
@@ -161,17 +171,22 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                configurePullToRefresh(url);
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
                 errorLayout.setVisibility(View.GONE);
 
                 if (!isPollingActive) startPolling();
+<<<<<<< HEAD
 
                 // ✅ با تأخیر، توکن FCM را با سرور سینک کن
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     checkIfLoggedInAndSync();
                 }, FCM_SYNC_DELAY);
 
+=======
+                syncFcmTokenWithServer();
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
                 openPendingNotificationLink();
             }
 
@@ -348,6 +363,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void fetchNewNotifications() {
         if (!isNetworkAvailable()) return;
+<<<<<<< HEAD
+=======
+        // شاید یک Push همین حالا در FirebaseMessagingService دریافت شده باشد؛
+        // مقدار ذخیره‌شده را بخوان تا polling همان اعلان را دوباره نشان ندهد.
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         lastNotificationId = Math.max(lastNotificationId, prefs.getInt("last_notification_id", 0));
         executor.execute(() -> {
             try {
@@ -396,6 +416,7 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+<<<<<<< HEAD
     private void syncFcmTokenWithServer() {
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
@@ -418,17 +439,37 @@ public class MainActivity extends AppCompatActivity {
             TokenSender.send(getApplicationContext(), token);
 
             prefs.edit().putLong("last_fcm_sync_time", now).apply();
+=======
+    /**
+     * FCM token پیش از ورود کاربر معتبر است، اما ثبت آن در سرور به سشنِ WebView نیاز دارد.
+     * به همین دلیل پس از پایان هر صفحه نیز همگام‌سازی می‌کنیم تا بلافاصله پس از login ثبت شود.
+     */
+    private void syncFcmTokenWithServer() {
+        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
+            if (!task.isSuccessful() || task.getResult() == null) return;
+
+            String token = task.getResult();
+            String registeredToken = prefs.getString("registered_fcm_token", "");
+            if (!token.equals(registeredToken)) {
+                TokenSender.send(getApplicationContext(), token);
+            }
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         });
     }
 
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
+<<<<<<< HEAD
+=======
+
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         String link = intent.getStringExtra("notification_link");
         if (link != null && !link.trim().isEmpty()) {
             pendingNotificationLink = link.trim();
         }
     }
 
+<<<<<<< HEAD
     // ============================================================
     // ✅ جدید: استخراج URL از Deep Link
     // easypod://m/123  →  https://easypood.ir/cmms/m/123
@@ -466,6 +507,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void openPendingNotificationLink() {
         if (pendingNotificationLink == null || webView == null) return;
+=======
+    private void openPendingNotificationLink() {
+        if (pendingNotificationLink == null || webView == null) return;
+
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         String link = pendingNotificationLink;
         String targetUrl;
         if (link.startsWith("/")) {
@@ -473,9 +519,17 @@ public class MainActivity extends AppCompatActivity {
         } else if (link.startsWith(APP_URL)) {
             targetUrl = link;
         } else {
+<<<<<<< HEAD
             pendingNotificationLink = null;
             return;
         }
+=======
+            // پیوندهای بیرونی از Push اجرا نمی‌شوند.
+            pendingNotificationLink = null;
+            return;
+        }
+
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         pendingNotificationLink = null;
         if (!targetUrl.equals(webView.getUrl())) {
             webView.loadUrl(targetUrl);
@@ -491,6 +545,29 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         swipeRefresh.setColorSchemeResources(android.R.color.holo_blue_bright);
+        swipeRefresh.setDistanceToTriggerSync(dpToPx(REFRESH_TRIGGER_DISTANCE_DP));
+    }
+
+    /**
+     * چت پیام‌ها را در یک div قابل‌اسکرول داخل WebView نمایش می‌دهد. SwipeRefreshLayout
+     * از موقعیت آن div خبر ندارد و حرکت برای پیام‌های قدیمی را با refresh اشتباه می‌گیرد.
+     * بنابراین pull-to-refresh در صفحه‌های چت غیرفعال است؛ در باقی صفحات فعال می‌ماند.
+     */
+    private void configurePullToRefresh(String url) {
+        if (url == null || swipeRefresh == null) return;
+
+        String path = Uri.parse(url).getPath();
+        boolean isChatPage = path != null
+            && (path.equals("/cmms/chat") || path.startsWith("/cmms/chat/"));
+
+        if (isChatPage && swipeRefresh.isRefreshing()) {
+            swipeRefresh.setRefreshing(false);
+        }
+        swipeRefresh.setEnabled(!isChatPage);
+    }
+
+    private int dpToPx(int dp) {
+        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void setupRetryButton() {
@@ -549,6 +626,7 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleNotificationIntent(intent);
+<<<<<<< HEAD
 
         // ✅ بررسی Deep Link جدید (اگر اپ از قبل باز بود)
         String deepLinkUrl = extractDeepLinkUrl(intent);
@@ -558,12 +636,15 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
+=======
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         openPendingNotificationLink();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+<<<<<<< HEAD
 
         // ===== اعلان‌ها =====
         if (requestCode == NOTIFICATION_PERMISSION_CODE) {
@@ -600,6 +681,11 @@ public class MainActivity extends AppCompatActivity {
                     });
                 }
             }
+=======
+        if (requestCode == NOTIFICATION_PERMISSION_CODE
+                && (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
+            Toast.makeText(this, "برای دریافت اعلان‌های EasyPod، اجازهٔ اعلان را فعال کنید.", Toast.LENGTH_LONG).show();
+>>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         }
     }
 
