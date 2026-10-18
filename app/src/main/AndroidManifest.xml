@@ -1,48 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ============================================ -->
+    <!-- مجوزهای اینترنت و شبکه                      -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+    <!-- ============================================ -->
+    <!-- مجوزهای اعلان (FCM)                          -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" 
+
+    <!-- ============================================ -->
+    <!-- مجوزهای ذخیره‌سازی (برای دانلود فایل)         -->
+    <!-- ============================================ -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
-    
-    <!-- ✅ جدید: دسترسی به دوربین برای اسکن QR -->
+
+    <!-- ============================================ -->
+    <!-- مجوز دوربین (برای اسکن QR)                    -->
+    <!-- ============================================ -->
     <uses-permission android:name="android.permission.CAMERA" />
-    <uses-feature android:name="android.hardware.camera" android:required="false" />
-    <uses-feature android:name="android.hardware.camera.autofocus" android:required="false" />
-    
+
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.autofocus"
+        android:required="false" />
+    <uses-feature
+        android:name="android.hardware.camera.front"
+        android:required="false" />
+
+    <!-- ============================================ -->
+    <!-- Application                                   -->
+    <!-- ✅ تغییر مهم: theme به Theme.EasyPod.Splash  -->
+    <!-- ============================================ -->
     <application
         android:label="EasyPod"
-        android:icon="@mipmap/ic_launcher"
-        android:roundIcon="@mipmap/ic_launcher"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
-        android:theme="@style/Theme.EasyPod">
-        
+        android:theme="@style/Theme.EasyPod.Splash">
+
+        <!-- ============================================ -->
+        <!-- Activity اصلی                                -->
+        <!-- ============================================ -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden">
-            
+
             <!-- Intent-filter اصلی (اجرای عادی اپ) -->
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
-            
-            <!-- ✅ جدید: Deep Link برای اسکن با دوربین پیش‌فرض گوشی -->
-            <!-- easypod://m/123 → شناسنامه دستگاه -->
+
+            <!-- Intent-filter برای Deep Link -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="easypod" />
             </intent-filter>
+
         </activity>
-        
-        <!-- سرویس FCM -->
+
+        <!-- ============================================ -->
+        <!-- سرویس FCM                                    -->
+        <!-- ============================================ -->
         <service
             android:name=".MyFirebaseMessagingService"
             android:exported="false">
@@ -50,7 +79,10 @@
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
-        
+
+        <!-- ============================================ -->
+        <!-- FileProvider                                  -->
+        <!-- ============================================ -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="com.example.easypod.fileprovider"
@@ -60,9 +92,13 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
-        
+
+        <!-- ============================================ -->
+        <!-- متادیتای FCM                                 -->
+        <!-- ============================================ -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="easypod_notifications_v2" />
+
     </application>
 </manifest>
