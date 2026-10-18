@@ -1,16 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     
+    <!-- ============================================ -->
+    <!-- تم اصلی اپ                                   -->
+    <!-- ============================================ -->
     <style name="Theme.EasyPod" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
     
-    <style name="Theme.EasyPod.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@drawable/splash_background_wrapper</item>
-        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
-        <item name="windowSplashScreenAnimationDuration">0</item>
-        <item name="postSplashScreenTheme">@style/Theme.EasyPod</item>
+    <!-- ============================================ -->
+    <!-- ✅ تم SplashActivity — تمام‌صفحه بدون عنوان    -->
+    <!-- ============================================ -->
+    <style name="Theme.EasyPod.SplashActivity" parent="Theme.AppCompat.Light.NoActionBar">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowBackground">@color/splash_background_color</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:statusBarColor">#1a7a7a</item>
+        <item name="android:navigationBarColor">#1a7a7a</item>
     </style>
     
 </resources>
