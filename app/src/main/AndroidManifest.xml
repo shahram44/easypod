@@ -36,21 +36,22 @@
 
     <!-- ============================================ -->
     <!-- Application                                   -->
-    <!-- ✅ تغییر مهم: theme به Theme.EasyPod.Splash  -->
     <!-- ============================================ -->
     <application
         android:label="EasyPod"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:usesCleartextTraffic="true"
         android:requestLegacyExternalStorage="true"
-        android:theme="@style/Theme.EasyPod.Splash">
+        android:theme="@style/Theme.EasyPod">
 
         <!-- ============================================ -->
-        <!-- Activity اصلی                                -->
+        <!-- ✅ SplashActivity — اولین صفحه (تصویر تمام‌صفحه) -->
         <!-- ============================================ -->
         <activity
-            android:name=".MainActivity"
+            android:name=".SplashActivity"
             android:exported="true"
-            android:launchMode="singleTop"
+            android:theme="@style/Theme.EasyPod.SplashActivity"
             android:configChanges="orientation|screenSize|keyboardHidden">
 
             <!-- Intent-filter اصلی (اجرای عادی اپ) -->
@@ -59,7 +60,7 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Intent-filter برای Deep Link -->
+            <!-- ✅ Intent-filter برای Deep Link (باز شدن اپ از طریق لینک easypod://) -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -70,7 +71,17 @@
         </activity>
 
         <!-- ============================================ -->
-        <!-- سرویس FCM                                    -->
+        <!-- ✅ MainActivity — صفحه اصلی (WebView)        -->
+        <!-- ============================================ -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:configChanges="orientation|screenSize|keyboardHidden">
+        </activity>
+
+        <!-- ============================================ -->
+        <!-- سرویس FCM (Firebase Messaging)              -->
         <!-- ============================================ -->
         <service
             android:name=".MyFirebaseMessagingService"
@@ -81,7 +92,7 @@
         </service>
 
         <!-- ============================================ -->
-        <!-- FileProvider                                  -->
+        <!-- FileProvider (برای آپلود عکس در WebView)     -->
         <!-- ============================================ -->
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -94,7 +105,7 @@
         </provider>
 
         <!-- ============================================ -->
-        <!-- متادیتای FCM                                 -->
+        <!-- متادیتای FCM برای کانال پیش‌فرض               -->
         <!-- ============================================ -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
