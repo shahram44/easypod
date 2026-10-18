@@ -35,7 +35,6 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.core.splashscreen.SplashScreen;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -72,11 +71,6 @@ public class MainActivity extends AppCompatActivity {
     private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
     private final static long FCM_SYNC_DELAY = 5000;
 
-    // ✅ متغیرهای SplashScreen
-    private boolean webViewLoaded = false;
-    private long splashStartTime = 0;
-    private static final long SPLASH_MAX_DURATION = 2000; // حداکثر ۲ ثانیه
-
     private SharedPreferences prefs;
     private Handler pollingHandler;
     private Runnable pollingRunnable;
@@ -90,33 +84,10 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
-        // ============================================
-        // ✅ نصب SplashScreen (باید قبل از super.onCreate باشد)
-        // ============================================
-        splashStartTime = System.currentTimeMillis();
-        
-        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
-        
-        // ✅ نگه داشتن splash تا لود WebView (حداکثر ۲ ثانیه)
-        splashScreen.setKeepOnScreenCondition(() -> {
-            // اگر WebView لود شده → splash ببند
-            if (webViewLoaded) return false;
-            
-            // اگر بیش از ۲ ثانیه گذشته → splash ببند
-            long elapsed = System.currentTimeMillis() - splashStartTime;
-            if (elapsed > SPLASH_MAX_DURATION) {
-                Log.w(TAG, "Splash timeout - WebView هنوز لود نشده، splash بسته می‌شود");
-                return false;
-            }
-            
-            // در غیر این صورت، splash باز بمان
-            return true;
-        });
-
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        Log.d(TAG, "🚀 onCreate شروع شد");
+        Log.d(TAG, "🚀 MainActivity onCreate شروع شد");
         Log.d(TAG, "📱 SDK version: " + Build.VERSION.SDK_INT);
         Log.d(TAG, "📱 Device: " + Build.MANUFACTURER + " " + Build.MODEL);
 
@@ -138,6 +109,7 @@ public class MainActivity extends AppCompatActivity {
         setupSwipeRefresh();
         setupRetryButton();
 
+        // ✅ پردازش Intent که از SplashActivity آمده
         handleNotificationIntent(getIntent());
         String initialDeepLink = extractDeepLinkUrl(getIntent());
 
@@ -150,8 +122,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             showErrorPage();
-            // ✅ در صورت عدم اتصال، splash را ببند
-            webViewLoaded = true;
         }
     }
 
@@ -220,10 +190,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 Log.d(TAG, "✅ onPageFinished: " + url);
-                
-                // ✅ علامت زدن WebView به عنوان لود شده (برای بستن splash)
-                webViewLoaded = true;
-                
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
                 errorLayout.setVisibility(View.GONE);
@@ -241,10 +207,6 @@ public class MainActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
                     Log.e(TAG, "❌ onReceivedError: " + error.getDescription());
-                    
-                    // ✅ در صورت خطا هم splash را ببند
-                    webViewLoaded = true;
-                    
                     showErrorPage();
                 }
             }
