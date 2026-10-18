@@ -1,14 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    
+    <!-- ============================================ -->
+    <!-- تم اصلی اپ (بعد از Splash)                   -->
+    <!-- ============================================ -->
     <style name="Theme.EasyPod" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
     
+    <!-- ============================================ -->
+    <!-- ✅ تم Splash — تصویر تمام‌صفحه                -->
+    <!-- ============================================ -->
     <style name="Theme.EasyPod.Splash" parent="Theme.SplashScreen">
-        <item name="windowSplashScreenBackground">@color/splash_background</item>
-        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
-        <item name="windowSplashScreenAnimationDuration">1000</item>
+        
+        <!-- ✅ تصویر کامل ۱۰۸۰×۱۹۲۰ به عنوان پس‌زمینه -->
+        <item name="windowSplashScreenBackground">@drawable/splash_background</item>
+        
+        <!-- ✅ آیکون شفاف (تا هیچ آیکونی روی تصویر نیفتد) -->
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        
+        <!-- بدون انیمیشن (چون آیکون نداریم) -->
+        <item name="windowSplashScreenAnimationDuration">0</item>
+        
+        <!-- تم بعدی بعد از splash -->
         <item name="postSplashScreenTheme">@style/Theme.EasyPod</item>
     </style>
+    
 </resources>
