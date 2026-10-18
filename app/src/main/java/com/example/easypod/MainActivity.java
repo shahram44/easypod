@@ -35,6 +35,7 @@ import android.widget.Toast;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.firebase.messaging.FirebaseMessaging;
@@ -71,6 +72,11 @@ public class MainActivity extends AppCompatActivity {
     private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
     private final static long FCM_SYNC_DELAY = 5000;
 
+    // ✅ متغیرهای SplashScreen
+    private boolean webViewLoaded = false;
+    private long splashStartTime = 0;
+    private static final long SPLASH_MAX_DURATION = 2000; // حداکثر ۲ ثانیه
+
     private SharedPreferences prefs;
     private Handler pollingHandler;
     private Runnable pollingRunnable;
@@ -84,6 +90,29 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // ============================================
+        // ✅ نصب SplashScreen (باید قبل از super.onCreate باشد)
+        // ============================================
+        splashStartTime = System.currentTimeMillis();
+        
+        SplashScreen splashScreen = SplashScreen.installSplashScreen(this);
+        
+        // ✅ نگه داشتن splash تا لود WebView (حداکثر ۲ ثانیه)
+        splashScreen.setKeepOnScreenCondition(() -> {
+            // اگر WebView لود شده → splash ببند
+            if (webViewLoaded) return false;
+            
+            // اگر بیش از ۲ ثانیه گذشته → splash ببند
+            long elapsed = System.currentTimeMillis() - splashStartTime;
+            if (elapsed > SPLASH_MAX_DURATION) {
+                Log.w(TAG, "Splash timeout - WebView هنوز لود نشده، splash بسته می‌شود");
+                return false;
+            }
+            
+            // در غیر این صورت، splash باز بمان
+            return true;
+        });
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -101,7 +130,7 @@ public class MainActivity extends AppCompatActivity {
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
 
-        // ✅ بررسی وضعیت دسترسی دوربین در لحظه شروع
+        // بررسی وضعیت دسترسی دوربین در لحظه شروع
         checkCameraPermissionStatus();
 
         requestNotificationPermission();
@@ -121,6 +150,8 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             showErrorPage();
+            // ✅ در صورت عدم اتصال، splash را ببند
+            webViewLoaded = true;
         }
     }
 
@@ -133,9 +164,6 @@ public class MainActivity extends AppCompatActivity {
             Log.d(TAG, "✅ دسترسی دوربین: قبلاً داده شده");
         } else {
             Log.d(TAG, "⚠️ دسترسی دوربین: هنوز داده نشده");
-            // درخواست دسترسی از همان ابتدا (بهتر است قبل از لود صفحه از کاربر بپرسیم)
-            // این کار تجربه کاربری بهتری می‌دهد چون اولین بار که صفحه باز می‌شود
-            // دیگر نیازی به نمایش دیالوگ نیست
             ActivityCompat.requestPermissions(
                     this,
                     new String[]{Manifest.permission.CAMERA},
@@ -170,8 +198,6 @@ public class MainActivity extends AppCompatActivity {
         settings.setSupportZoom(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-
-        // ✅ این تنظیمات مهم هستند برای getUserMedia
         settings.setAllowUniversalAccessFromFileURLs(true);
         settings.setAllowFileAccessFromFileURLs(true);
 
@@ -194,6 +220,10 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 Log.d(TAG, "✅ onPageFinished: " + url);
+                
+                // ✅ علامت زدن WebView به عنوان لود شده (برای بستن splash)
+                webViewLoaded = true;
+                
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
                 errorLayout.setVisibility(View.GONE);
@@ -211,12 +241,15 @@ public class MainActivity extends AppCompatActivity {
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
                 if (request.isForMainFrame()) {
                     Log.e(TAG, "❌ onReceivedError: " + error.getDescription());
+                    
+                    // ✅ در صورت خطا هم splash را ببند
+                    webViewLoaded = true;
+                    
                     showErrorPage();
                 }
             }
         });
 
-        // ✅ این مهم‌ترین بخش است
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
@@ -230,11 +263,9 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "   Origin: " + request.getOrigin());
                 Log.d(TAG, "   Resources: " + java.util.Arrays.toString(request.getResources()));
 
-                // بررسی اینکه آیا درخواست شامل دوربین است
                 boolean needCamera = false;
                 boolean needAudio = false;
                 for (String resource : request.getResources()) {
-                    Log.d(TAG, "   - Resource: " + resource);
                     if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
                         needCamera = true;
                     }
@@ -246,7 +277,6 @@ public class MainActivity extends AppCompatActivity {
                 Log.d(TAG, "   نیاز به دوربین: " + needCamera + " | نیاز به میکروفن: " + needAudio);
 
                 if (!needCamera) {
-                    // درخواست دوربین نیست، اجازه بده
                     runOnUiThread(() -> {
                         try {
                             request.grant(request.getResources());
@@ -257,7 +287,6 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                // بررسی دسترسی دوربین در اندروید
                 if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
                         != PackageManager.PERMISSION_GRANTED) {
                     Log.d(TAG, "⚠️ دسترسی دوربین نداریم، درخواست از کاربر");
@@ -270,7 +299,6 @@ public class MainActivity extends AppCompatActivity {
                     return;
                 }
 
-                // دسترسی داریم، اجازه بده
                 Log.d(TAG, "✅ دسترسی دوربین داریم، grant می‌کنیم");
                 runOnUiThread(() -> {
                     try {
