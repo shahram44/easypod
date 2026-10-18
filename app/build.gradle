@@ -12,7 +12,7 @@ android {
         minSdk 24
         targetSdk 34
         versionCode 3
-        versionName "1.2.2"
+        versionName "1.2.0"
     }
 
     buildTypes {
@@ -41,7 +41,10 @@ dependencies {
     implementation 'androidx.core:core:1.12.0'
     implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
 
-    // کتابخانه DataStore برای Firebase (رفع خطای ClassNotFoundException)
+    // ✅ SplashScreen API
+    implementation 'androidx.core:core-splashscreen:1.0.1'
+
+    // DataStore برای Firebase
     implementation "androidx.datastore:datastore-preferences:1.2.1"
 
     // Firebase BoM

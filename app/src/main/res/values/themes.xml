@@ -1,29 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    
-    <!-- ============================================ -->
-    <!-- تم اصلی اپ (بعد از Splash)                   -->
-    <!-- ============================================ -->
     <style name="Theme.EasyPod" parent="Theme.AppCompat.Light.NoActionBar">
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
     </style>
     
-    <!-- ============================================ -->
-    <!-- ✅ تم Splash (زمانی که اپ باز می‌شود)         -->
-    <!-- ============================================ -->
     <style name="Theme.EasyPod.Splash" parent="Theme.SplashScreen">
-        <!-- رنگ پس‌زمینه splash -->
         <item name="windowSplashScreenBackground">@color/splash_background</item>
-        
-        <!-- آیکون وسط splash -->
         <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
-        
-        <!-- مدت انیمیشن آیکون (میلی‌ثانیه) -->
         <item name="windowSplashScreenAnimationDuration">1000</item>
-        
-        <!-- تمی که بعد از splash اعمال می‌شود -->
         <item name="postSplashScreenTheme">@style/Theme.EasyPod</item>
     </style>
-    
 </resources>
