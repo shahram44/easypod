@@ -61,19 +61,14 @@ public class MainActivity extends AppCompatActivity {
 
     private final static int FILE_CHOOSER_RESULT_CODE = 1;
     private final static int NOTIFICATION_PERMISSION_CODE = 100;
-    // ✅ جدید: کد درخواست دسترسی دوربین
     private final static int CAMERA_PERMISSION_CODE = 101;
 
     private final static String APP_URL = "https://easypood.ir/cmms/";
     private final static String API_BASE = "https://easypood.ir/cmms/api";
     private final static String BASE_HOST = "https://easypood.ir/cmms";
     private final static long POLLING_INTERVAL = 30000;
-    // برای refresh باید یک کشش عمدی انجام شود، نه حرکت کوتاه هنگام اسکرول.
-    private final static int REFRESH_TRIGGER_DISTANCE_DP = 144;
 
-    // ✅ حداقل فاصله بین دو sync موفق FCM (2 دقیقه)
     private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
-    // ✅ تأخیر پس از لود صفحه قبل از ارسال توکن (5 ثانیه)
     private final static long FCM_SYNC_DELAY = 5000;
 
     private SharedPreferences prefs;
@@ -83,17 +78,18 @@ public class MainActivity extends AppCompatActivity {
     private int lastNotificationId = 0;
     private boolean isPollingActive = false;
     private String pendingNotificationLink;
-<<<<<<< HEAD
 
-    // ✅ جدید: نگهداری درخواست دسترسی دوربین که منتظر تأیید کاربر است
+    // ✅ نگهداری درخواست دوربین که منتظر تأیید کاربر است
     private PermissionRequest pendingCameraPermissionRequest;
-=======
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        Log.d(TAG, "🚀 onCreate شروع شد");
+        Log.d(TAG, "📱 SDK version: " + Build.VERSION.SDK_INT);
+        Log.d(TAG, "📱 Device: " + Build.MANUFACTURER + " " + Build.MODEL);
 
         prefs = getSharedPreferences("easypod_prefs", MODE_PRIVATE);
         lastNotificationId = prefs.getInt("last_notification_id", 0);
@@ -105,18 +101,16 @@ public class MainActivity extends AppCompatActivity {
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
 
+        // ✅ بررسی وضعیت دسترسی دوربین در لحظه شروع
+        checkCameraPermissionStatus();
+
         requestNotificationPermission();
         setupWebView();
         setupSwipeRefresh();
         setupRetryButton();
 
-<<<<<<< HEAD
-        // ✅ پردازش Intent اولیه (می‌تواند Deep Link یا نوتیفیکیشن باشد)
         handleNotificationIntent(getIntent());
         String initialDeepLink = extractDeepLinkUrl(getIntent());
-=======
-        handleNotificationIntent(getIntent());
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
 
         if (isNetworkAvailable()) {
             if (initialDeepLink != null) {
@@ -127,6 +121,26 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             showErrorPage();
+        }
+    }
+
+    /**
+     * ✅ بررسی وضعیت دسترسی دوربین در لحظه شروع
+     */
+    private void checkCameraPermissionStatus() {
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
+                == PackageManager.PERMISSION_GRANTED) {
+            Log.d(TAG, "✅ دسترسی دوربین: قبلاً داده شده");
+        } else {
+            Log.d(TAG, "⚠️ دسترسی دوربین: هنوز داده نشده");
+            // درخواست دسترسی از همان ابتدا (بهتر است قبل از لود صفحه از کاربر بپرسیم)
+            // این کار تجربه کاربری بهتری می‌دهد چون اولین بار که صفحه باز می‌شود
+            // دیگر نیازی به نمایش دیالوگ نیست
+            ActivityCompat.requestPermissions(
+                    this,
+                    new String[]{Manifest.permission.CAMERA},
+                    CAMERA_PERMISSION_CODE
+            );
         }
     }
 
@@ -142,9 +156,12 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void setupWebView() {
+        Log.d(TAG, "🔧 setupWebView شروع");
+
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
         settings.setDomStorageEnabled(true);
+        settings.setDatabaseEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
         settings.setAllowFileAccess(true);
@@ -152,10 +169,15 @@ public class MainActivity extends AppCompatActivity {
         settings.setBuiltInZoomControls(false);
         settings.setSupportZoom(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
-
-        // ✅ جدید: پشتیبانی از MediaPlayback و getUserMedia
         settings.setMediaPlaybackRequiresUserGesture(false);
+
+        // ✅ این تنظیمات مهم هستند برای getUserMedia
+        settings.setAllowUniversalAccessFromFileURLs(true);
+        settings.setAllowFileAccessFromFileURLs(true);
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+        }
 
         CookieManager.getInstance().setAcceptCookie(true);
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
@@ -163,7 +185,7 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient() {
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
-                configurePullToRefresh(url);
+                Log.d(TAG, "📄 onPageStarted: " + url);
                 progressBar.setVisibility(View.VISIBLE);
                 progressBar.setProgress(0);
                 errorLayout.setVisibility(View.GONE);
@@ -171,31 +193,30 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
-                configurePullToRefresh(url);
+                Log.d(TAG, "✅ onPageFinished: " + url);
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
                 errorLayout.setVisibility(View.GONE);
 
                 if (!isPollingActive) startPolling();
-<<<<<<< HEAD
 
-                // ✅ با تأخیر، توکن FCM را با سرور سینک کن
                 new Handler(Looper.getMainLooper()).postDelayed(() -> {
                     checkIfLoggedInAndSync();
                 }, FCM_SYNC_DELAY);
 
-=======
-                syncFcmTokenWithServer();
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
                 openPendingNotificationLink();
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
-                if (request.isForMainFrame()) showErrorPage();
+                if (request.isForMainFrame()) {
+                    Log.e(TAG, "❌ onReceivedError: " + error.getDescription());
+                    showErrorPage();
+                }
             }
         });
 
+        // ✅ این مهم‌ترین بخش است
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
@@ -203,57 +224,60 @@ public class MainActivity extends AppCompatActivity {
                 if (newProgress == 100) progressBar.setVisibility(View.GONE);
             }
 
-            // ============================================================
-            // ✅ جدید: مدیریت درخواست دسترسی (دوربین برای اسکن QR)
-            // ============================================================
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
-                Log.d(TAG, "onPermissionRequest: " + java.util.Arrays.toString(request.getResources()));
+                Log.d(TAG, "🔔 onPermissionRequest صدا زده شد!");
+                Log.d(TAG, "   Origin: " + request.getOrigin());
+                Log.d(TAG, "   Resources: " + java.util.Arrays.toString(request.getResources()));
 
                 // بررسی اینکه آیا درخواست شامل دوربین است
                 boolean needCamera = false;
                 boolean needAudio = false;
                 for (String resource : request.getResources()) {
+                    Log.d(TAG, "   - Resource: " + resource);
                     if (PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resource)) {
                         needCamera = true;
-                    } else if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
+                    }
+                    if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(resource)) {
                         needAudio = true;
                     }
                 }
 
-                // اگر فقط دوربین لازم است (اسکن QR)
-                if (needCamera && !needAudio) {
-                    // بررسی دسترسی دوربین در سطح اندروید
-                    if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
-                            != PackageManager.PERMISSION_GRANTED) {
-                        // هنوز دسترسی نداریم → از کاربر بخواهیم
-                        pendingCameraPermissionRequest = request;
-                        ActivityCompat.requestPermissions(
-                                MainActivity.this,
-                                new String[]{Manifest.permission.CAMERA},
-                                CAMERA_PERMISSION_CODE
-                        );
-                        return;
-                    }
-                    // دسترسی داریم → به WebView بده
+                Log.d(TAG, "   نیاز به دوربین: " + needCamera + " | نیاز به میکروفن: " + needAudio);
+
+                if (!needCamera) {
+                    // درخواست دوربین نیست، اجازه بده
                     runOnUiThread(() -> {
                         try {
                             request.grant(request.getResources());
                         } catch (Exception e) {
-                            Log.e(TAG, "خطا در grant کردن دسترسی دوربین: " + e.getMessage());
-                            try { request.deny(); } catch (Exception ignored) {}
+                            Log.e(TAG, "خطا در grant: " + e.getMessage());
                         }
                     });
                     return;
                 }
 
-                // درخواست‌های دیگر (مثلاً میکروفن) → اجازه می‌دهیم
-                // اگر نمی‌خواهید اجازه دهید، این قسمت را حذف کنید
+                // بررسی دسترسی دوربین در اندروید
+                if (ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.CAMERA)
+                        != PackageManager.PERMISSION_GRANTED) {
+                    Log.d(TAG, "⚠️ دسترسی دوربین نداریم، درخواست از کاربر");
+                    pendingCameraPermissionRequest = request;
+                    ActivityCompat.requestPermissions(
+                            MainActivity.this,
+                            new String[]{Manifest.permission.CAMERA},
+                            CAMERA_PERMISSION_CODE
+                    );
+                    return;
+                }
+
+                // دسترسی داریم، اجازه بده
+                Log.d(TAG, "✅ دسترسی دوربین داریم، grant می‌کنیم");
                 runOnUiThread(() -> {
                     try {
                         request.grant(request.getResources());
+                        Log.d(TAG, "✅ grant موفق");
                     } catch (Exception e) {
-                        Log.e(TAG, "خطا در grant کردن دسترسی: " + e.getMessage());
+                        Log.e(TAG, "❌ خطا در grant: " + e.getMessage());
                         try { request.deny(); } catch (Exception ignored) {}
                     }
                 });
@@ -304,9 +328,6 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-    /**
-     * ✅ بررسی با JavaScript که کاربر لاگین است یا نه
-     */
     private void checkIfLoggedInAndSync() {
         if (webView == null) return;
 
@@ -314,25 +335,17 @@ public class MainActivity extends AppCompatActivity {
             "(function() {" +
             "   var navbarUser = document.querySelector('.navbar-user');" +
             "   var loginForm = document.querySelector('form#loginFormSubmit');" +
-            "   " +
             "   var isLoggedIn = (navbarUser !== null) && (loginForm === null);" +
-            "   " +
             "   var userIdMeta = document.querySelector('meta[name=\"user-id\"]');" +
             "   if (userIdMeta && userIdMeta.content && parseInt(userIdMeta.content) > 0) {" +
             "       isLoggedIn = true;" +
             "   }" +
-            "   " +
             "   return isLoggedIn ? 'YES' : 'NO';" +
             "})()",
             result -> {
                 boolean isLoggedIn = result != null && result.contains("YES");
-                Log.d(TAG, "بررسی لاگین: نتیجه = " + result + " | isLoggedIn = " + isLoggedIn);
-
                 if (isLoggedIn) {
-                    Log.d(TAG, "✅ کاربر لاگین است، شروع sync توکن FCM");
                     syncFcmTokenWithServer();
-                } else {
-                    Log.d(TAG, "❌ کاربر لاگین نیست، sync انجام نمی‌شود");
                 }
             }
         );
@@ -363,11 +376,6 @@ public class MainActivity extends AppCompatActivity {
 
     private void fetchNewNotifications() {
         if (!isNetworkAvailable()) return;
-<<<<<<< HEAD
-=======
-        // شاید یک Push همین حالا در FirebaseMessagingService دریافت شده باشد؛
-        // مقدار ذخیره‌شده را بخوان تا polling همان اعلان را دوباره نشان ندهد.
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         lastNotificationId = Math.max(lastNotificationId, prefs.getInt("last_notification_id", 0));
         executor.execute(() -> {
             try {
@@ -416,64 +424,34 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
-<<<<<<< HEAD
     private void syncFcmTokenWithServer() {
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
-                Log.e(TAG, "syncFcm: خطا در دریافت توکن از Firebase", task.getException());
+                Log.e(TAG, "syncFcm: خطا", task.getException());
                 return;
             }
 
             String token = task.getResult();
-            Log.d(TAG, "syncFcm: توکن Firebase دریافت شد (طول: " + token.length() + ")");
-
             long lastSyncTime = prefs.getLong("last_fcm_sync_time", 0);
             long now = System.currentTimeMillis();
 
             if (now - lastSyncTime < FCM_SYNC_MIN_INTERVAL) {
-                Log.d(TAG, "syncFcm: کمتر از " + (FCM_SYNC_MIN_INTERVAL / 1000) + " ثانیه از sync قبلی، صرف‌نظر");
                 return;
             }
 
-            Log.d(TAG, "syncFcm: ارسال توکن به سرور...");
             TokenSender.send(getApplicationContext(), token);
-
             prefs.edit().putLong("last_fcm_sync_time", now).apply();
-=======
-    /**
-     * FCM token پیش از ورود کاربر معتبر است، اما ثبت آن در سرور به سشنِ WebView نیاز دارد.
-     * به همین دلیل پس از پایان هر صفحه نیز همگام‌سازی می‌کنیم تا بلافاصله پس از login ثبت شود.
-     */
-    private void syncFcmTokenWithServer() {
-        FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
-            if (!task.isSuccessful() || task.getResult() == null) return;
-
-            String token = task.getResult();
-            String registeredToken = prefs.getString("registered_fcm_token", "");
-            if (!token.equals(registeredToken)) {
-                TokenSender.send(getApplicationContext(), token);
-            }
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         });
     }
 
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
-<<<<<<< HEAD
-=======
-
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         String link = intent.getStringExtra("notification_link");
         if (link != null && !link.trim().isEmpty()) {
             pendingNotificationLink = link.trim();
         }
     }
 
-<<<<<<< HEAD
-    // ============================================================
-    // ✅ جدید: استخراج URL از Deep Link
-    // easypod://m/123  →  https://easypood.ir/cmms/m/123
-    // ============================================================
     private String extractDeepLinkUrl(Intent intent) {
         if (intent == null) return null;
         Uri data = intent.getData();
@@ -484,10 +462,8 @@ public class MainActivity extends AppCompatActivity {
             return null;
         }
 
-        // easypod://m/123 → path = "/123" و host = "m"
-        // easypod://machines/view/123 → path = "/view/123" و host = "machines"
-        String host = data.getHost();  // "m" یا "machines"
-        String path = data.getPath();  // "/123" یا "/view/123"
+        String host = data.getHost();
+        String path = data.getPath();
 
         if (host == null) host = "";
 
@@ -498,20 +474,11 @@ public class MainActivity extends AppCompatActivity {
             fullPath = "/" + host + path;
         }
 
-        // ساخت URL کامل
-        String finalUrl = BASE_HOST + fullPath;
-
-        Log.d(TAG, "🔗 Deep Link استخراج شد: " + finalUrl);
-        return finalUrl;
+        return BASE_HOST + fullPath;
     }
 
     private void openPendingNotificationLink() {
         if (pendingNotificationLink == null || webView == null) return;
-=======
-    private void openPendingNotificationLink() {
-        if (pendingNotificationLink == null || webView == null) return;
-
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         String link = pendingNotificationLink;
         String targetUrl;
         if (link.startsWith("/")) {
@@ -519,17 +486,9 @@ public class MainActivity extends AppCompatActivity {
         } else if (link.startsWith(APP_URL)) {
             targetUrl = link;
         } else {
-<<<<<<< HEAD
             pendingNotificationLink = null;
             return;
         }
-=======
-            // پیوندهای بیرونی از Push اجرا نمی‌شوند.
-            pendingNotificationLink = null;
-            return;
-        }
-
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         pendingNotificationLink = null;
         if (!targetUrl.equals(webView.getUrl())) {
             webView.loadUrl(targetUrl);
@@ -545,29 +504,6 @@ public class MainActivity extends AppCompatActivity {
             }
         });
         swipeRefresh.setColorSchemeResources(android.R.color.holo_blue_bright);
-        swipeRefresh.setDistanceToTriggerSync(dpToPx(REFRESH_TRIGGER_DISTANCE_DP));
-    }
-
-    /**
-     * چت پیام‌ها را در یک div قابل‌اسکرول داخل WebView نمایش می‌دهد. SwipeRefreshLayout
-     * از موقعیت آن div خبر ندارد و حرکت برای پیام‌های قدیمی را با refresh اشتباه می‌گیرد.
-     * بنابراین pull-to-refresh در صفحه‌های چت غیرفعال است؛ در باقی صفحات فعال می‌ماند.
-     */
-    private void configurePullToRefresh(String url) {
-        if (url == null || swipeRefresh == null) return;
-
-        String path = Uri.parse(url).getPath();
-        boolean isChatPage = path != null
-            && (path.equals("/cmms/chat") || path.startsWith("/cmms/chat/"));
-
-        if (isChatPage && swipeRefresh.isRefreshing()) {
-            swipeRefresh.setRefreshing(false);
-        }
-        swipeRefresh.setEnabled(!isChatPage);
-    }
-
-    private int dpToPx(int dp) {
-        return Math.round(dp * getResources().getDisplayMetrics().density);
     }
 
     private void setupRetryButton() {
@@ -626,27 +562,22 @@ public class MainActivity extends AppCompatActivity {
         super.onNewIntent(intent);
         setIntent(intent);
         handleNotificationIntent(intent);
-<<<<<<< HEAD
 
-        // ✅ بررسی Deep Link جدید (اگر اپ از قبل باز بود)
         String deepLinkUrl = extractDeepLinkUrl(intent);
         if (deepLinkUrl != null && webView != null) {
-            Log.d(TAG, "🚀 Deep Link جدید: " + deepLinkUrl);
             webView.loadUrl(deepLinkUrl);
             return;
         }
 
-=======
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         openPendingNotificationLink();
     }
 
     @Override
     public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-<<<<<<< HEAD
 
-        // ===== اعلان‌ها =====
+        Log.d(TAG, "📋 onRequestPermissionsResult: requestCode=" + requestCode);
+
         if (requestCode == NOTIFICATION_PERMISSION_CODE) {
             if (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED) {
                 Toast.makeText(this, "برای دریافت اعلان‌های EasyPod، اجازهٔ اعلان را فعال کنید.", Toast.LENGTH_LONG).show();
@@ -654,18 +585,20 @@ public class MainActivity extends AppCompatActivity {
             return;
         }
 
-        // ===== ✅ دوربین (برای اسکن QR) =====
         if (requestCode == CAMERA_PERMISSION_CODE) {
             if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
                 Log.d(TAG, "✅ دسترسی دوربین داده شد");
+                Toast.makeText(this, "✅ دسترسی دوربین فعال شد. اکنون می‌توانید QR اسکن کنید.", Toast.LENGTH_SHORT).show();
+
                 if (pendingCameraPermissionRequest != null) {
                     final PermissionRequest req = pendingCameraPermissionRequest;
                     pendingCameraPermissionRequest = null;
                     runOnUiThread(() -> {
                         try {
                             req.grant(req.getResources());
+                            Log.d(TAG, "✅ grant پس از تأیید کاربر");
                         } catch (Exception e) {
-                            Log.e(TAG, "خطا در grant کردن دسترسی دوربین: " + e.getMessage());
+                            Log.e(TAG, "❌ خطا در grant: " + e.getMessage());
                             try { req.deny(); } catch (Exception ignored) {}
                         }
                     });
@@ -681,11 +614,6 @@ public class MainActivity extends AppCompatActivity {
                     });
                 }
             }
-=======
-        if (requestCode == NOTIFICATION_PERMISSION_CODE
-                && (grantResults.length == 0 || grantResults[0] != PackageManager.PERMISSION_GRANTED)) {
-            Toast.makeText(this, "برای دریافت اعلان‌های EasyPod، اجازهٔ اعلان را فعال کنید.", Toast.LENGTH_LONG).show();
->>>>>>> 5c32421 (رفع خطای Firebase با DataStore)
         }
     }
 
