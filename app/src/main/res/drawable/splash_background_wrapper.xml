@@ -1,1 +1,19 @@
-
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    
+    <!-- پس‌زمینه رنگی (برای پر کردن حاشیه‌ها در گوشی‌های بلندتر) -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#1a7a7a" />
+        </shape>
+    </item>
+    
+    <!-- تصویر لوگو در مرکز، بدون کشیدگی -->
+    <item>
+        <bitmap
+            android:src="@drawable/splash_background"
+            android:gravity="center"
+            android:scaleType="centerInside" />
+    </item>
+    
+</layer-list>
