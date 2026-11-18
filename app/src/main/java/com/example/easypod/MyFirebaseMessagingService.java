@@ -17,8 +17,12 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
         // اگر پیام دارای notification باشد
         if (remoteMessage.getNotification() != null) {
-            title = remoteMessage.getNotification().getTitle();
-            message = remoteMessage.getNotification().getBody();
+            if (remoteMessage.getNotification().getTitle() != null) {
+                title = remoteMessage.getNotification().getTitle();
+            }
+            if (remoteMessage.getNotification().getBody() != null) {
+                message = remoteMessage.getNotification().getBody();
+            }
         }
 
         // اگر پیام دارای data باشد (اطلاعات بیشتر)
@@ -34,9 +38,53 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
             }
         }
 
+        // محافظت در برابر مقادیر null (اعلان بدون عنوان یا متن)
+        if (title == null || title.trim().isEmpty()) {
+            title = "EasyPod";
+        }
+        if (message == null) {
+            message = "";
+        }
+
+        // ✅ خواندن شناسه اعلان از سرور (اگر وجود داشته باشد)
+        //    شناسه معتبر فقط همان است که سرور در data می‌فرستد؛
+        //    fallback (زمان سیستم) هرگز نباید در prefs ذخیره شود چون
+        //    خط آخرین شناسه (last_notification_id) را خراب می‌کند و
+        //    polling دیگر هیچ اعلانی را دریافت نخواهد کرد.
+        Integer serverId = null;
+        try {
+            String id = remoteMessage.getData().get("notification_id");
+            if (id != null && !id.isEmpty()) {
+                serverId = Integer.parseInt(id);
+            }
+        } catch (NumberFormatException ignored) {
+            Log.w(TAG, "شناسه اعلان FCM معتبر نیست");
+        }
+
+        // ✅ جلوگیری از نمایش تکراری اعلان:
+        //    وقتی اپ در حال اجراست، polling هر ۳۰ ثانیه اعلان‌های جدید را
+        //    می‌گیرد و نمایش می‌دهد و شناسه‌اش را در prefs ثبت می‌کند.
+        //    اگر FCM با همان شناسه بعدتر برسد، نباید دوباره نمایش داده شود.
+        if (serverId != null) {
+            android.content.SharedPreferences prefs =
+                getSharedPreferences("easypod_prefs", MODE_PRIVATE);
+            int lastShownId = prefs.getInt("last_notification_id", 0);
+            if (serverId <= lastShownId) {
+                Log.d(TAG, "اعلان شناسه " + serverId + " قبلاً نمایش داده شده است — تکراری، رد شد");
+                return;
+            }
+        }
+
         // نمایش نوتیفیکیشن
-        int notificationId = getNotificationId(remoteMessage);
-        rememberLastNotificationId(notificationId);
+        int notificationId = (serverId != null)
+                ? serverId
+                : (int) (System.currentTimeMillis() & 0x7fffffff);
+
+        // فقط شناسه‌های واقعی سرور ثبت می‌شوند (نه fallback زمانی)
+        if (serverId != null) {
+            rememberLastNotificationId(notificationId);
+        }
+
         NotificationHelper.showNotification(this, notificationId, title, message, link);
     }
 
@@ -49,18 +97,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
 
     private void sendTokenToServer(String token) {
         TokenSender.send(getApplicationContext(), token);
-    }
-
-    private int getNotificationId(RemoteMessage remoteMessage) {
-        try {
-            String id = remoteMessage.getData().get("notification_id");
-            if (id != null && !id.isEmpty()) {
-                return Integer.parseInt(id);
-            }
-        } catch (NumberFormatException ignored) {
-            Log.w(TAG, "شناسه اعلان FCM معتبر نیست");
-        }
-        return (int) (System.currentTimeMillis() & 0x7fffffff);
     }
 
     private void rememberLastNotificationId(int notificationId) {

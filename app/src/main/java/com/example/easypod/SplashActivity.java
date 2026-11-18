@@ -20,17 +20,30 @@ public class SplashActivity extends AppCompatActivity {
         // ✅ بعد از ۱.۵ ثانیه به MainActivity می‌رود
         new Handler(Looper.getMainLooper()).postDelayed(() -> {
             Intent intent = new Intent(SplashActivity.this, MainActivity.class);
-            
+
             // ✅ اگر از Deep Link یا Notification آمده، به MainActivity پاس بده
             Intent originalIntent = getIntent();
             if (originalIntent != null && originalIntent.getData() != null) {
                 intent.setData(originalIntent.getData());
             }
-            if (originalIntent != null && originalIntent.hasExtra("notification_link")) {
-                intent.putExtra("notification_link", 
-                    originalIntent.getStringExtra("notification_link"));
+
+            // ✅ لینک اعلان را پاس بده.
+            //    حالت ۱) اعلان اپ خودمان: extra با نام notification_link
+            //    حالت ۲) اعلان سیستمی FCM (وقتی اپ بسته/پس‌زمینه است و کاربر
+            //            روی اعلان می‌زند): داده‌های پیام به‌صورت extra با نام
+            //            link (کلید data سرور) به Activity لانچر ارسال می‌شوند.
+            if (originalIntent != null) {
+                String notificationLink = null;
+                if (originalIntent.hasExtra("notification_link")) {
+                    notificationLink = originalIntent.getStringExtra("notification_link");
+                } else if (originalIntent.hasExtra("link")) {
+                    notificationLink = originalIntent.getStringExtra("link");
+                }
+                if (notificationLink != null && !notificationLink.trim().isEmpty()) {
+                    intent.putExtra("notification_link", notificationLink.trim());
+                }
             }
-            
+
             startActivity(intent);
             finish();
         }, SPLASH_DURATION);

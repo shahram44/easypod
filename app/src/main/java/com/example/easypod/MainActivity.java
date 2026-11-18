@@ -162,14 +162,20 @@ public class MainActivity extends AppCompatActivity {
         settings.setDatabaseEnabled(true);
         settings.setLoadWithOverviewMode(true);
         settings.setUseWideViewPort(true);
-        settings.setAllowFileAccess(true);
-        settings.setAllowContentAccess(true);
+        // ✅ دسترسی فایل و content خاموش می‌شود — اپ فقط https://easypood.ir را
+        //    باز می‌کند و به URLهای file:// و content:// نیازی ندارد؛
+        //    این کار سطح حمله XSS محتوا به فایل‌های محلی را از بین می‌برد.
+        settings.setAllowFileAccess(false);
+        settings.setAllowContentAccess(false);
         settings.setBuiltInZoomControls(false);
         settings.setSupportZoom(false);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
-        settings.setAllowUniversalAccessFromFileURLs(true);
-        settings.setAllowFileAccessFromFileURLs(true);
+        // ✅ این دو تنظیم فقط برای صفحات file:// معنی دارند؛ چون هیچ صفحه‌ای از
+        //    file:// باز نمی‌شود، به‌صورت ایمن خاموش می‌شوند (جلوگیری از خواندن
+        //    فایل‌های محلی توسط اسکریپت‌های ناخواسته).
+        settings.setAllowUniversalAccessFromFileURLs(false);
+        settings.setAllowFileAccessFromFileURLs(false);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
@@ -179,6 +185,20 @@ public class MainActivity extends AppCompatActivity {
         CookieManager.getInstance().setAcceptThirdPartyCookies(webView, true);
 
         webView.setWebViewClient(new WebViewClient() {
+            // ✅ مدیریت لینک‌ها: لینک‌های داخلی easypod.ir داخل WebView باز
+            //    می‌شوند؛ شماره تلفن، پیامک، ایمیل، نقشه و سایر اپ‌ها خارج از اپ؛
+            //    سایر سایت‌ها هم در مرورگر خارجی باز می‌شوند نه داخل اپ.
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
+                return handleUrlNavigation(request.getUrl());
+            }
+
+            // برای سازگاری با WebViewهای قدیمی‌تر که نسخه String را صدا می‌زنند
+            @Override
+            public boolean shouldOverrideUrlLoading(WebView view, String url) {
+                return handleUrlNavigation(Uri.parse(url));
+            }
+
             @Override
             public void onPageStarted(WebView view, String url, Bitmap favicon) {
                 Log.d(TAG, "📄 onPageStarted: " + url);
@@ -437,8 +457,58 @@ public class MainActivity extends AppCompatActivity {
     private void handleNotificationIntent(Intent intent) {
         if (intent == null) return;
         String link = intent.getStringExtra("notification_link");
+        if (link == null || link.trim().isEmpty()) {
+            // ✅ اعلان سیستمی FCM (tap در حالت پس‌زمینه) کلید data سرور را
+            //    به‌صورت extra با نام link می‌فرستد — به‌عنوان پشتیبان خوانده می‌شود
+            link = intent.getStringExtra("link");
+        }
         if (link != null && !link.trim().isEmpty()) {
             pendingNotificationLink = link.trim();
+        }
+    }
+
+    /**
+     * ✅ مسیریابی هوشمند لینک‌ها
+     * @return true اگر لینک خارج از WebView مدیریت شده باشد
+     */
+    private boolean handleUrlNavigation(Uri uri) {
+        if (uri == null || uri.getScheme() == null) return false;
+
+        String scheme = uri.getScheme().toLowerCase();
+
+        // ۱) http/https: فقط easypood.ir داخل اپ می‌ماند
+        if (scheme.equals("https") || scheme.equals("http")) {
+            String host = uri.getHost();
+            if (host != null && host.equalsIgnoreCase("easypood.ir")) {
+                return false; // داخل WebView باز شود
+            }
+            openExternal(uri); // سایر سایت‌ها → مرورگر خارجی
+            return true;
+        }
+
+        // ۲) شماره تلفن / پیامک / ایمیل / نقشه / سایر اپ‌ها → خارج از اپ
+        if (scheme.equals("tel") || scheme.equals("sms") || scheme.equals("smsto")
+                || scheme.equals("mailto") || scheme.equals("geo")
+                || scheme.equals("whatsapp") || scheme.equals("intent")
+                || scheme.equals("market")) {
+            openExternal(uri);
+            return true;
+        }
+
+        // بقیه schemeهای ناشناخته → WebView خودش امتحان کند
+        return false;
+    }
+
+    /**
+     * ✅ باز کردن لینک با اپ مناسب گوشی (تماس، پیامک، ایمیل، نقشه، مرورگر)
+     */
+    private void openExternal(Uri uri) {
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, uri);
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.w(TAG, "برنامه‌ای برای باز کردن لینک پیدا نشد: " + uri);
+            Toast.makeText(this, "برنامه‌ای برای باز کردن این لینک پیدا نشد", Toast.LENGTH_SHORT).show();
         }
     }
 
