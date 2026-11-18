@@ -1,16 +1,28 @@
-
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#1a7a7a">
 
-    <!-- ✅ تصویر تمام‌صفحه -->
+    <!-- ✅ لوگوی EasyPod در مرکز صفحه -->
+    <!-- قبلاً تصویری ارجاع داده شده بود که فایلش در پروژه وجود نداشت و باعث
+         شکست Build می‌شد؛ اکنون از splash_icon موجود استفاده می‌شود -->
     <ImageView
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:src="@drawable/splash_background"
-        android:scaleType="centerCrop"
-        android:contentDescription="Splash" />
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:src="@drawable/splash_icon"
+        android:scaleType="centerInside"
+        android:contentDescription="EasyPod" />
+
+    <!-- ✅ شمارهٔ نسخهٔ نصب‌شده در پایین صفحه (از SplashActivity مقداردهی می‌شود) -->
+    <TextView
+        android:id="@+id/splashVersion"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="40dp"
+        android:textColor="#FFFFFF"
+        android:textSize="12sp" />
 
 </FrameLayout>
