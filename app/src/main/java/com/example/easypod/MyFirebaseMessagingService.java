@@ -91,8 +91,6 @@ public class MyFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onNewToken(String token) {
         Log.d(TAG, "توکن جدید FCM: " + token);
-        // ✅ DIAG: صدور توکن جدید توسط گوگل (معمولاً بعد از نصب/پاک کردن دیتا)
-        Diag.show(this, "توکن جدید FCM صادر شد — در حال ارسال به سرور...");
         // ارسال توکن به سرور
         sendTokenToServer(token);
     }

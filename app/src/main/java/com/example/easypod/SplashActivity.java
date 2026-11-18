@@ -2,9 +2,11 @@
 package com.example.easypod;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -16,6 +18,20 @@ public class SplashActivity extends AppCompatActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_splash);
+
+        // ✅ نمایش شمارهٔ نسخهٔ نصب‌شده در پایین صفحهٔ اسپلش
+        //    (برای اطمینان این‌که واقعاً کدام نسخه روی گوشی اجرا می‌شود)
+        String installedVersion = "";
+        try {
+            installedVersion = getPackageManager()
+                    .getPackageInfo(getPackageName(), 0).versionName;
+        } catch (PackageManager.NameNotFoundException e) {
+            installedVersion = "";
+        }
+        TextView versionText = findViewById(R.id.splashVersion);
+        if (versionText != null && !installedVersion.isEmpty()) {
+            versionText.setText("EasyPod v" + installedVersion);
+        }
 
         // ✅ بعد از ۱.۵ ثانیه به MainActivity می‌رود
         new Handler(Looper.getMainLooper()).postDelayed(() -> {

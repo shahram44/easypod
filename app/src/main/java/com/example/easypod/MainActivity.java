@@ -30,7 +30,6 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
-import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -92,9 +91,6 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "📱 SDK version: " + Build.VERSION.SDK_INT);
         Log.d(TAG, "📱 Device: " + Build.MANUFACTURER + " " + Build.MODEL);
 
-        // ✅ DIAG: تأیید نصب بودن نسخه عیب‌یاب
-        Diag.show(this, "نسخه عیب‌یاب فعال شد (1.2.2-diag2)");
-
         prefs = getSharedPreferences("easypod_prefs", MODE_PRIVATE);
         lastNotificationId = prefs.getInt("last_notification_id", 0);
         executor = Executors.newSingleThreadExecutor();
@@ -104,9 +100,6 @@ public class MainActivity extends AppCompatActivity {
         swipeRefresh = findViewById(R.id.swipeRefresh);
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
-
-        // ✅ DIAG: وصل کردن پنل عیب‌یابی بالای صفحه
-        Diag.attach((TextView) findViewById(R.id.diagLog));
 
         // بررسی وضعیت دسترسی دوربین در لحظه شروع حذف شد —
         // ✅ مجوز دوربین حالا فقط وقتی کاربر واقعاً اسکن QR را باز می‌کند
@@ -335,23 +328,20 @@ public class MainActivity extends AppCompatActivity {
     private void checkIfLoggedInAndSync() {
         if (webView == null) return;
 
-        // ✅ DIAG: نتیجه تشخیص لاگین با جزئیات کامل برگردانده می‌شود
         webView.evaluateJavascript(
             "(function() {" +
             "   var navbarUser = document.querySelector('.navbar-user');" +
             "   var loginForm = document.querySelector('form#loginFormSubmit');" +
+            "   var isLoggedIn = (navbarUser !== null) && (loginForm === null);" +
             "   var userIdMeta = document.querySelector('meta[name=\"user-id\"]');" +
-            "   var metaVal = (userIdMeta && userIdMeta.content) ? parseInt(userIdMeta.content) : 0;" +
-            "   if (metaVal > 0) { return 'YES_META_' + metaVal; }" +
-            "   if (navbarUser !== null && loginForm === null) { return 'YES_NAVBAR'; }" +
-            "   if (navbarUser === null) { return 'NO_NAVBAR'; }" +
-            "   return 'NO_LOGINFORM';" +
+            "   if (userIdMeta && userIdMeta.content && parseInt(userIdMeta.content) > 0) {" +
+            "       isLoggedIn = true;" +
+            "   }" +
+            "   return isLoggedIn ? 'YES' : 'NO';" +
             "})()",
             result -> {
-                String detail = (result == null || result.equals("null"))
-                        ? "NULL" : result.replace("\"", "").trim();
-                Diag.show(this, "۱/۵ تشخیص لاگین: " + detail);
-                if (detail.startsWith("YES")) {
+                boolean isLoggedIn = result != null && result.contains("YES");
+                if (isLoggedIn) {
                     syncFcmTokenWithServer();
                 }
             }
@@ -432,30 +422,20 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void syncFcmTokenWithServer() {
-        Diag.show(this, "۲/۵ در حال گرفتن توکن از گوگل (FCM)...");
         FirebaseMessaging.getInstance().getToken().addOnCompleteListener(task -> {
             if (!task.isSuccessful() || task.getResult() == null) {
-                String err = (task.getException() != null)
-                        ? task.getException().getMessage() : "دلیل نامشخص";
-                Diag.show(this, "۲/۵ ❌ توکن از گوگل گرفته نشد: " + err);
                 Log.e(TAG, "syncFcm: خطا", task.getException());
                 return;
             }
 
             String token = task.getResult();
-            Diag.show(this, "۲/۵ ✅ توکن از گوگل گرفته شد (طول " + token.length() + ")");
-
             long lastSyncTime = prefs.getLong("last_fcm_sync_time", 0);
             long now = System.currentTimeMillis();
-            long remainMs = FCM_SYNC_MIN_INTERVAL - (now - lastSyncTime);
 
-            if (remainMs > 0) {
-                Diag.show(this, "۳/۵ ⏸ مهلت ۲ دقیقه‌ای فعال است — حدود "
-                        + (remainMs / 1000) + " ثانیه دیگر، بین صفحات جابه‌جا شوید");
+            if (now - lastSyncTime < FCM_SYNC_MIN_INTERVAL) {
                 return;
             }
 
-            Diag.show(this, "۳/۵ ✅ مجاز به ارسال — در حال آماده‌سازی...");
             TokenSender.send(getApplicationContext(), token);
             prefs.edit().putLong("last_fcm_sync_time", now).apply();
         });
