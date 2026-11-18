@@ -28,6 +28,20 @@
             android:layout_height="match_parent" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <!-- ✅ DIAG: پنل عیب‌یابی موقت — بعد از رفع مشکل حذف می‌شود -->
+    <TextView
+        android:id="@+id/diagLog"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_alignParentTop="true"
+        android:background="#CC1A1A1A"
+        android:padding="6dp"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:fontFamily="monospace"
+        android:lineSpacingExtra="2dp"
+        android:text="🔍 DIAG" />
+
     <!-- صفحه خطای اینترنت -->
     <LinearLayout
         android:id="@+id/errorLayout"
