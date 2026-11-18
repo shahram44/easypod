@@ -30,6 +30,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -92,7 +93,7 @@ public class MainActivity extends AppCompatActivity {
         Log.d(TAG, "📱 Device: " + Build.MANUFACTURER + " " + Build.MODEL);
 
         // ✅ DIAG: تأیید نصب بودن نسخه عیب‌یاب
-        Diag.show(this, "نسخه عیب‌یاب فعال شد (1.2.2-diag)");
+        Diag.show(this, "نسخه عیب‌یاب فعال شد (1.2.2-diag2)");
 
         prefs = getSharedPreferences("easypod_prefs", MODE_PRIVATE);
         lastNotificationId = prefs.getInt("last_notification_id", 0);
@@ -103,6 +104,9 @@ public class MainActivity extends AppCompatActivity {
         swipeRefresh = findViewById(R.id.swipeRefresh);
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
+
+        // ✅ DIAG: وصل کردن پنل عیب‌یابی بالای صفحه
+        Diag.attach((TextView) findViewById(R.id.diagLog));
 
         // بررسی وضعیت دسترسی دوربین در لحظه شروع حذف شد —
         // ✅ مجوز دوربین حالا فقط وقتی کاربر واقعاً اسکن QR را باز می‌کند
