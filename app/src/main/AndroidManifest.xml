@@ -41,7 +41,7 @@
         android:label="EasyPod"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
-        android:usesCleartextTraffic="true"
+        android:usesCleartextTraffic="false"
         android:requestLegacyExternalStorage="true"
         android:theme="@style/Theme.EasyPod">
 
