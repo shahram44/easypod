@@ -101,8 +101,9 @@ public class MainActivity extends AppCompatActivity {
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
 
-        // بررسی وضعیت دسترسی دوربین در لحظه شروع
-        checkCameraPermissionStatus();
+        // بررسی وضعیت دسترسی دوربین در لحظه شروع حذف شد —
+        // ✅ مجوز دوربین حالا فقط وقتی کاربر واقعاً اسکن QR را باز می‌کند
+        //    از طریق onPermissionRequest (WebChromeClient) درخواست می‌شود.
 
         requestNotificationPermission();
         setupWebView();
@@ -122,23 +123,6 @@ public class MainActivity extends AppCompatActivity {
             }
         } else {
             showErrorPage();
-        }
-    }
-
-    /**
-     * ✅ بررسی وضعیت دسترسی دوربین در لحظه شروع
-     */
-    private void checkCameraPermissionStatus() {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA)
-                == PackageManager.PERMISSION_GRANTED) {
-            Log.d(TAG, "✅ دسترسی دوربین: قبلاً داده شده");
-        } else {
-            Log.d(TAG, "⚠️ دسترسی دوربین: هنوز داده نشده");
-            ActivityCompat.requestPermissions(
-                    this,
-                    new String[]{Manifest.permission.CAMERA},
-                    CAMERA_PERMISSION_CODE
-            );
         }
     }
 
@@ -178,7 +162,10 @@ public class MainActivity extends AppCompatActivity {
         settings.setAllowFileAccessFromFileURLs(false);
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
+            // ✅ حالت سازگار با مرورگر (کروم): محتوای http با سیاست cleartext
+            //    (خاموش در Manifest) مهار می‌شود؛ فقط تصاویر ناچ http مثل کروم
+            //    اجازه شناور شدن دارند — امن‌تر از ALWAYS_ALLOW.
+            settings.setMixedContentMode(WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE);
         }
 
         CookieManager.getInstance().setAcceptCookie(true);
