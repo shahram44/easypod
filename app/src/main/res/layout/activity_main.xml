@@ -3,13 +3,13 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent">
 
-    <!-- نوار پیشرفت بالای صفحه -->
+    <!-- نوار پیشرفت پایین صفحه -->
     <ProgressBar
         android:id="@+id/progressBar"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="3dp"
-        android:layout_alignParentTop="true"
+        android:layout_alignParentBottom="true"
         android:indeterminate="false"
         android:max="100"
         android:progressTint="#2196F3"
@@ -20,7 +20,7 @@
         android:id="@+id/swipeRefresh"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_below="@id/progressBar">
+        android:layout_above="@id/progressBar">
 
         <WebView
             android:id="@+id/webView"
