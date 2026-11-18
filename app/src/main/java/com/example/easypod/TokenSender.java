@@ -23,7 +23,9 @@ public class TokenSender {
         new Thread(() -> {
             HttpURLConnection conn = null;
             try {
-                // ✅ اطمینان از اینکه CookieManager آماده است
+                // ✅ DIAG مرحله ۴: خواندن کوکی لاگین
+                Diag.show(context, "۴/۵ در حال خواندن کوکی لاگین...");
+
                 CookieManager cookieManager = CookieManager.getInstance();
                 cookieManager.setAcceptCookie(true);
                 cookieManager.flush();
@@ -35,11 +37,14 @@ public class TokenSender {
 
                 // ✅ اگر Cookie خالی است، اصلاً درخواست نده
                 if (cookie == null || cookie.isEmpty()) {
+                    Diag.show(context, "۴/۵ ❌ کوکی خالی — اپ لاگین نیست یا کوکی ذخیره نشده");
                     Log.e(TAG, "❌ Cookie خالی است - کاربر لاگین نیست یا سشن منقضی شده");
                     Log.e(TAG, "❌ توکن ارسال نشد. لطفاً دوباره در اپ لاگین کنید.");
                     return;
                 }
 
+                Diag.show(context, "۴/۵ ✅ کوکی پیدا شد (طول " + cookie.length()
+                        + ") — در حال ارسال به سرور...");
                 Log.d(TAG, "✅ Cookie دریافت شد (طول: " + cookie.length() + " کاراکتر)");
 
                 URL url = new URL(API_URL);
@@ -75,7 +80,11 @@ public class TokenSender {
                 if (responseCode >= 200 && responseCode < 300) {
                     reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
                 } else {
-                    reader = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
+                    if (conn.getErrorStream() != null) {
+                        reader = new BufferedReader(new InputStreamReader(conn.getErrorStream()));
+                    } else {
+                        reader = new BufferedReader(new InputStreamReader(conn.getInputStream()));
+                    }
                 }
 
                 StringBuilder response = new StringBuilder();
@@ -87,6 +96,11 @@ public class TokenSender {
 
                 Log.d(TAG, "📥 پاسخ: " + response.toString());
 
+                String preview = response.length() > 150
+                        ? response.substring(0, 150) + "..."
+                        : response.toString();
+                Diag.show(context, "۵/۵ پاسخ سرور — کد " + responseCode + " | " + preview);
+
                 SharedPreferences prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE);
 
                 if (responseCode >= 200 && responseCode < 300) {
@@ -96,6 +110,7 @@ public class TokenSender {
                             .putLong("last_fcm_sync_time", System.currentTimeMillis())
                             .apply();
 
+                    Diag.show(context, "✅ ثبت کامل شد — جدول user_devices را چک کنید");
                     Log.d(TAG, "✅ توکن با موفقیت در سرور ثبت شد");
                 } else {
                     // ❌ خطا: توکن قبلی را پاک کن تا دفعه بعد دوباره تلاش کند
@@ -104,10 +119,12 @@ public class TokenSender {
                             .remove("last_fcm_sync_time")
                             .apply();
 
+                    Diag.show(context, "❌ سرور ثبت نکرد (کد " + responseCode + ")");
                     Log.w(TAG, "❌ توکن در سرور ثبت نشد (خطای " + responseCode + ")");
                 }
 
             } catch (Exception e) {
+                Diag.show(context, "❌ خطای شبکه در ارسال توکن: " + e.getMessage());
                 Log.e(TAG, "❌ خطا در TokenSender: " + e.getMessage(), e);
             } finally {
                 if (conn != null) conn.disconnect();
