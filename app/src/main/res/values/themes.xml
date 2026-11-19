@@ -16,7 +16,8 @@
         <item name="windowActionBar">false</item>
         <item name="windowNoTitle">true</item>
         <item name="android:windowBackground">@color/splash_background</item>
-        <item name="android:windowFullscreen">false</item>
+        <!-- ✅ v4: اسپلش تمام‌صفحه — نوار وضعیت (ساعت/آنتن) مخفی -->
+        <item name="android:windowFullscreen">true</item>
         <item name="android:statusBarColor">#1a7a7a</item>
         <item name="android:navigationBarColor">#1a7a7a</item>
     </style>
