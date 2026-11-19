@@ -30,6 +30,7 @@ import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
@@ -71,6 +72,13 @@ public class MainActivity extends AppCompatActivity {
     private final static long FCM_SYNC_MIN_INTERVAL = 2 * 60 * 1000;
     private final static long FCM_SYNC_DELAY = 5000;
 
+    // ✅ v4: اسپلش — حداقل ۳ ثانیه نمایش + ماندن تا پایان بارگذاری اولیه
+    private static final long SPLASH_MIN_DISPLAY_MS = 3000;
+    // ✅ v4: اگر بارگذاری صفحه پس از ۲۰ ثانیه کامل نشد → پیام تلاش مجدد
+    private static final long LOAD_TIMEOUT_MS = 20000;
+    // ✅ v4: فاصله کشیدن لازم برای رفرش (dp) — پیش‌فرض ۶۴dp خیلی حساس بود
+    private static final long PULL_REFRESH_TRIGGER_DP = 200;
+
     private SharedPreferences prefs;
     private Handler pollingHandler;
     private Runnable pollingRunnable;
@@ -82,10 +90,22 @@ public class MainActivity extends AppCompatActivity {
     // ✅ نگهداری درخواست دوربین که منتظر تأیید کاربر است
     private PermissionRequest pendingCameraPermissionRequest;
 
+    // ✅ v4: لایه اسپلش و مدیریت بارگذاری اولیه
+    private View splashOverlay;
+    private View splashTimeoutBox;
+    private Button splashRetryButton;
+    private Handler splashHandler;
+    private long splashShownAt;
+    private boolean initialPageLoaded = false;
+    private boolean splashHidden = false;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
+        // ✅ v4: مخفی‌کردن نوار وضعیت (ساعت/آنتن) — دکمه‌های پایین باقی می‌مانند
+        hideStatusBar();
 
         Log.d(TAG, "🚀 MainActivity onCreate شروع شد");
         Log.d(TAG, "📱 SDK version: " + Build.VERSION.SDK_INT);
@@ -100,6 +120,19 @@ public class MainActivity extends AppCompatActivity {
         swipeRefresh = findViewById(R.id.swipeRefresh);
         errorLayout = findViewById(R.id.errorLayout);
         retryButton = findViewById(R.id.retryButton);
+
+        // ✅ v4: لایه اسپلش — همان تصویر صفحهٔ اول تا پایان بارگذاری اولیه
+        //    نمایش داده می‌شود (اینترنت ضعیف → اسپلش نمی‌پرد)
+        splashOverlay = findViewById(R.id.splashOverlay);
+        splashTimeoutBox = findViewById(R.id.splashTimeoutBox);
+        splashRetryButton = findViewById(R.id.splashRetryButton);
+        splashHandler = new Handler(Looper.getMainLooper());
+        splashShownAt = System.currentTimeMillis();
+        setSplashOverlayVersion();
+        if (splashRetryButton != null) {
+            splashRetryButton.setOnClickListener(v -> retryInitialLoad());
+        }
+        startInitialLoadWatchdog();
 
         // بررسی وضعیت دسترسی دوربین در لحظه شروع حذف شد —
         // ✅ مجوز دوربین حالا فقط وقتی کاربر واقعاً اسکن QR را باز می‌کند
@@ -192,6 +225,10 @@ public class MainActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.VISIBLE);
                 progressBar.setProgress(0);
                 errorLayout.setVisibility(View.GONE);
+
+                // ✅ v4: در صفحه چت‌ها Pull-to-Refresh غیرفعال می‌شود تا
+                //    اسکرول کردن و خواندن پیام‌های قبلی ممکن باشد
+                swipeRefresh.setEnabled(!isChatUrl(url));
             }
 
             @Override
@@ -200,6 +237,14 @@ public class MainActivity extends AppCompatActivity {
                 progressBar.setVisibility(View.GONE);
                 swipeRefresh.setRefreshing(false);
                 errorLayout.setVisibility(View.GONE);
+
+                // ✅ v4: پایان بارگذاری اولیه — تایمر ۲۰ ثانیه لغو و اسپلش
+                //    (پس از حداقل ۳ ثانیه) بسته می‌شود
+                if (!initialPageLoaded) {
+                    initialPageLoaded = true;
+                    cancelInitialLoadWatchdog();
+                }
+                dismissSplashOverlayWhenReady();
 
                 if (!isPollingActive) startPolling();
 
@@ -550,6 +595,18 @@ public class MainActivity extends AppCompatActivity {
                 showErrorPage();
             }
         });
+
+        // ✅ v4: کاهش شدید حساسیت Pull-to-Refresh
+        //    پیش‌فرض ۶۴dp است و با کوچک‌ترین لمس به پایین فعال می‌شد؛
+        //    حالا کشیدن حدود ۲۰۰dp لازم است (مقدار بر حسب پیکسل پاس داده می‌شود)
+        try {
+            int triggerPx = (int) (PULL_REFRESH_TRIGGER_DP
+                    * getResources().getDisplayMetrics().density);
+            swipeRefresh.setDistanceToTriggerSync(triggerPx);
+        } catch (Exception e) {
+            Log.w(TAG, "setDistanceToTriggerSync failed: " + e.getMessage());
+        }
+
         swipeRefresh.setColorSchemeResources(android.R.color.holo_blue_bright);
     }
 
@@ -565,6 +622,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showErrorPage() {
+        // ✅ v4: اگر اسپلش هنوز باز است، بسته شود تا صفحه خطا دیده شود
+        dismissSplashOverlay();
         errorLayout.setVisibility(View.VISIBLE);
         progressBar.setVisibility(View.GONE);
         swipeRefresh.setRefreshing(false);
@@ -577,6 +636,111 @@ public class MainActivity extends AppCompatActivity {
             return activeNetwork != null && activeNetwork.isConnected();
         }
         return false;
+    }
+
+    // ============================================================
+    // ✅ v4: مدیریت اسپلش، تایم‌اوت بارگذاری و نوار وضعیت
+    // ============================================================
+
+    /** آیا این آدرس مربوط به صفحه چت‌هاست؟ (Pull-to-Refresh آنجا غیرفعال می‌شود) */
+    private boolean isChatUrl(String url) {
+        if (url == null) return false;
+        try {
+            String path = Uri.parse(url).getPath();
+            return path != null && path.contains("/chat");
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** شماره نسخه روی لایه اسپلش داخل MainActivity */
+    private void setSplashOverlayVersion() {
+        try {
+            TextView tv = findViewById(R.id.splashOverlayVersion);
+            if (tv == null) return;
+            String v = getPackageManager().getPackageInfo(getPackageName(), 0).versionName;
+            if (v != null && !v.isEmpty()) {
+                tv.setText("EasyPod v" + v);
+            }
+        } catch (Exception ignored) {
+        }
+    }
+
+    /** شروع/ریست تایمر ۲۰ ثانیه‌ای بارگذاری اولیه */
+    private void startInitialLoadWatchdog() {
+        if (splashHandler == null) return;
+        splashHandler.removeCallbacksAndMessages(null);
+        splashHandler.postDelayed(() -> {
+            if (!initialPageLoaded && !splashHidden) {
+                Log.w(TAG, "⏳ بارگذاری اولیه بیش از ۲۰ ثانیه طول کشید");
+                showLoadTimeoutUI();
+            }
+        }, LOAD_TIMEOUT_MS);
+    }
+
+    private void cancelInitialLoadWatchdog() {
+        if (splashHandler != null) splashHandler.removeCallbacksAndMessages(null);
+    }
+
+    private void showLoadTimeoutUI() {
+        if (splashTimeoutBox != null) splashTimeoutBox.setVisibility(View.VISIBLE);
+    }
+
+    /** بستن اسپلش پس از حداقل ۳ ثانیه نمایش */
+    private void dismissSplashOverlayWhenReady() {
+        if (splashOverlay == null || splashHidden) return;
+        long delay = SPLASH_MIN_DISPLAY_MS - (System.currentTimeMillis() - splashShownAt);
+        if (delay > 0) {
+            splashHandler.postDelayed(this::dismissSplashOverlay, delay);
+        } else {
+            dismissSplashOverlay();
+        }
+    }
+
+    private void dismissSplashOverlay() {
+        splashHidden = true;
+        if (splashHandler != null) splashHandler.removeCallbacksAndMessages(null);
+        if (splashTimeoutBox != null) splashTimeoutBox.setVisibility(View.GONE);
+        if (splashOverlay != null) splashOverlay.setVisibility(View.GONE);
+    }
+
+    /** دکمه «تلاش مجدد» روی پیام تایم‌اوت */
+    private void retryInitialLoad() {
+        if (splashTimeoutBox != null) splashTimeoutBox.setVisibility(View.GONE);
+        if (!isNetworkAvailable()) {
+            Toast.makeText(MainActivity.this, "هنوز اینترنت وصل نیست", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        initialPageLoaded = false;
+        startInitialLoadWatchdog();
+        webView.reload();
+    }
+
+    /** ✅ v4: مخفی‌کردن نوار وضعیت — فقط نوار بالا؛ دکمه‌های پایین (Back/Home) باقی می‌مانند */
+    @SuppressWarnings("deprecation")
+    private void hideStatusBar() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                android.view.WindowInsetsController controller = getWindow().getInsetsController();
+                if (controller != null) {
+                    controller.setSystemBarsBehavior(
+                            android.view.WindowInsetsController.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+                    controller.hide(android.view.WindowInsets.Type.statusBars());
+                }
+            } else {
+                getWindow().getDecorView().setSystemUiVisibility(
+                        View.SYSTEM_UI_FLAG_FULLSCREEN
+                                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "hideStatusBar error: " + e.getMessage());
+        }
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (hasFocus) hideStatusBar();
     }
 
     @Override
