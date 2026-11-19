@@ -79,6 +79,16 @@
             android:exported="false"
             android:launchMode="singleTop"
             android:configChanges="orientation|screenSize|keyboardHidden">
+
+            <!-- ✅ EP-NTAP v5: هدف لمس اعلان FCM (رفع «کلیک اعلان هیچ واکنشی ندارد»)
+                 سرور در بخش android.notification مقدار click_action=OPEN_MAIN_ACTIVITY می‌فرستد.
+                 بدون این intent-filter سیستم نمی‌تواند PendingIntent بسازد و لمس اعلان بی‌اثر می‌ماند.
+                 داده‌های پیام (شامل link صفحه دستورکار) به‌صورت extra داخل همین Intent قرار می‌گیرند
+                 و MainActivity آن‌ها را از طریق handleNotificationIntent پردازش می‌کند. -->
+            <intent-filter>
+                <action android:name="OPEN_MAIN_ACTIVITY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
         </activity>
 
         <!-- ============================================ -->
