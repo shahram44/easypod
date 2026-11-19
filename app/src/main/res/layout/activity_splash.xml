@@ -7,12 +7,14 @@
     <!-- ✅ لوگوی EasyPod در مرکز صفحه -->
     <!-- قبلاً تصویری ارجاع داده شده بود که فایلش در پروژه وجود نداشت و باعث
          شکست Build می‌شد؛ اکنون از splash_icon موجود استفاده می‌شود -->
+    <!-- ✅ v4: تصویر اسپلش کاربر (res/drawable/splash_icon.png) — تمام‌صفحه
+         با حفظ نسبت تصویر (fitCenter). برای تعویض عکس فقط فایل splash_icon.png
+         را جایگزین کنید -->
     <ImageView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_gravity="center"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
         android:src="@drawable/splash_icon"
-        android:scaleType="centerInside"
+        android:scaleType="fitCenter"
         android:contentDescription="EasyPod" />
 
     <!-- ✅ شمارهٔ نسخهٔ نصب‌شده در پایین صفحه (از SplashActivity مقداردهی می‌شود) -->

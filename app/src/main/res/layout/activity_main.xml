@@ -70,4 +70,78 @@
             android:textColor="#FFFFFF" />
     </LinearLayout>
 
+    <!-- ============================================================ -->
+    <!-- ✅ v4: لایه اسپلش — همان تصویر صفحهٔ اول؛ تا پایان بارگذاری    -->
+    <!-- اولیه نمایش داده می‌شود (اینترنت ضعیف → اسپلش نمی‌پرد).        -->
+    <!-- اگر بارگذاری ۲۰ ثانیه طول بکشد، پیام «تلاش مجدد» می‌آید.       -->
+    <!-- آخرین فرزند است تا روی همه چیز قرار بگیرد.                     -->
+    <!-- ============================================================ -->
+    <FrameLayout
+        android:id="@+id/splashOverlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#1a7a7a">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:src="@drawable/splash_icon"
+            android:scaleType="fitCenter"
+            android:contentDescription="EasyPod" />
+
+        <TextView
+            android:id="@+id/splashOverlayVersion"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="40dp"
+            android:textColor="#FFFFFF"
+            android:textSize="12sp" />
+
+        <!-- پیام اتمام مهلت بارگذاری (۲۰ ثانیه) -->
+        <LinearLayout
+            android:id="@+id/splashTimeoutBox"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:background="#1a7a7a"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="⏳"
+                android:textSize="56sp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="بارگذاری بیش از حد طول کشید"
+                android:textSize="18sp"
+                android:textColor="#FFFFFF"
+                android:layout_marginTop="16dp" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="لطفاً اتصال اینترنت خود را بررسی کنید و دوباره تلاش کنید"
+                android:textSize="14sp"
+                android:textColor="#DDDDDD"
+                android:layout_marginTop="8dp"
+                android:gravity="center"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp" />
+
+            <Button
+                android:id="@+id/splashRetryButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="تلاش مجدد"
+                android:layout_marginTop="24dp"
+                android:backgroundTint="#2196F3"
+                android:textColor="#FFFFFF" />
+        </LinearLayout>
+    </FrameLayout>
+
 </RelativeLayout>
