@@ -497,6 +497,24 @@ public class MainActivity extends AppCompatActivity {
         if (link != null && !link.trim().isEmpty()) {
             pendingNotificationLink = link.trim();
         }
+
+        // ✅ EP-NTAP v5: شناسهٔ اعلانی که با لمس آن اپ باز شده ثبت می‌شود تا
+        //    polling پس از باز شدن اپ، همان اعلان را دوباره نمایش ندهد.
+        //    (اعلان سیستمی FCM از onMessageReceived عبور نمی‌کند و شناسه‌اش
+        //    قبلاً هیچ‌جا ثبت نمی‌شد؛ اپ/سرور در بقیهٔ مسیرها خودشان ثبت می‌کنند.)
+        try {
+            String tappedId = intent.getStringExtra("notification_id");
+            if (tappedId != null && !tappedId.trim().isEmpty()) {
+                int idVal = Integer.parseInt(tappedId.trim());
+                if (idVal > lastNotificationId) {
+                    lastNotificationId = idVal;
+                }
+                if (idVal > prefs.getInt("last_notification_id", 0)) {
+                    prefs.edit().putInt("last_notification_id", idVal).apply();
+                }
+            }
+        } catch (NumberFormatException ignored) {
+        }
     }
 
     /**
